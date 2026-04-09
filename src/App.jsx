@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { TESTS, STEPS, recommend } from "./statTestsData";
+import { Analytics } from "@vercel/analytics/react";
 
 const DESCRIPTIVES = {
   continuous_normal: {
@@ -706,6 +707,7 @@ export default function ChooseMyStat() {
           <p className="text-xs text-gray-400">AIIMS Bhopal · Clinical Epidemiology Unit</p>
         </div>
       </div>
+      <Analytics />
     </div>
   );
 }
