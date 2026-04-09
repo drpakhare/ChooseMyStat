@@ -381,26 +381,26 @@ function SlideTransition({ children, stepKey, direction }) {
   );
 }
 
-function OptionCard({ option, selected, onClick }) {
+function OptionCard({ option, selected, onClick, dark }) {
   const isSelected = selected === option.value;
   return (
     <button
       onClick={() => onClick(option.value)}
       className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
         isSelected
-          ? "border-indigo-500 bg-indigo-50 shadow-md"
-          : "border-gray-200 bg-white hover:border-indigo-300 hover:shadow-sm"
+          ? dark ? "border-indigo-500 bg-indigo-950 shadow-md" : "border-indigo-500 bg-indigo-50 shadow-md"
+          : dark ? "border-gray-700 bg-gray-800 hover:border-indigo-500 hover:shadow-sm" : "border-gray-200 bg-white hover:border-indigo-300 hover:shadow-sm"
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className={`flex-shrink-0 mt-0.5 ${isSelected ? "text-indigo-600" : "text-gray-400"}`}>
+        <div className={`flex-shrink-0 mt-0.5 ${isSelected ? "text-indigo-400" : dark ? "text-gray-500" : "text-gray-400"}`}>
           {typeof option.icon === "string" ? ICONS[option.icon] || <span className="text-2xl">{option.icon}</span> : option.icon}
         </div>
         <div>
-          <div className={`font-semibold text-base ${isSelected ? "text-indigo-700" : "text-gray-800"}`}>
+          <div className={`font-semibold text-base ${isSelected ? (dark ? "text-indigo-300" : "text-indigo-700") : (dark ? "text-gray-200" : "text-gray-800")}`}>
             {option.label}
           </div>
-          <div className="text-sm text-gray-500 mt-0.5">{option.desc}</div>
+          <div className={`text-sm mt-0.5 ${dark ? "text-gray-400" : "text-gray-500"}`}>{option.desc}</div>
         </div>
       </div>
     </button>
@@ -441,7 +441,7 @@ function TestResult({ testKey, useTraditional }) {
   const exampleText = useTraditional ? t.exampleTraditional : t.example;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-4">
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-4" style={{ background: "var(--card-bg, white)" }}>
       {/* Header */}
       <div className="bg-indigo-600 px-5 py-3">
         <h3 className="text-white font-bold text-lg">{t.name}</h3>
@@ -575,7 +575,7 @@ function DescriptiveResult({ descKey, useTraditional }) {
   const sapText = useTraditional ? d.sapTraditional : d.sap;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden mb-4">
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden mb-4" style={{ background: "var(--card-bg, white)" }}>
       <div className="bg-teal-600 px-5 py-3">
         <h3 className="text-white font-bold text-lg">{d.name}</h3>
       </div>
@@ -647,6 +647,66 @@ function DescriptiveResult({ descKey, useTraditional }) {
   );
 }
 
+// ─── Hex Logo (R-package style) ───
+function HexLogo({ dark }) {
+  return (
+    <svg viewBox="0 0 200 230" className="w-28 h-32 mx-auto mb-4 drop-shadow-lg">
+      <defs>
+        <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor={dark ? "#6366f1" : "#4f46e5"} />
+          <stop offset="100%" stopColor={dark ? "#818cf8" : "#6366f1"} />
+        </linearGradient>
+      </defs>
+      {/* Hex shape */}
+      <polygon
+        points="100,8 190,58 190,172 100,222 10,172 10,58"
+        fill="url(#hexGrad)"
+        stroke={dark ? "#a5b4fc" : "#312e81"}
+        strokeWidth="5"
+      />
+      {/* Decision tree icon */}
+      <circle cx="100" cy="60" r="10" fill="none" stroke="white" strokeWidth="3" />
+      <line x1="100" y1="70" x2="100" y2="95" stroke="white" strokeWidth="3" />
+      <line x1="100" y1="95" x2="65" y2="125" stroke="white" strokeWidth="3" />
+      <line x1="100" y1="95" x2="135" y2="125" stroke="white" strokeWidth="3" />
+      <circle cx="65" cy="130" r="8" fill="none" stroke="white" strokeWidth="3" />
+      <circle cx="135" cy="130" r="8" fill="none" stroke="white" strokeWidth="3" />
+      {/* Text */}
+      <text x="100" y="172" textAnchor="middle" fill="white" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="24" letterSpacing="0.5">
+        Choose
+      </text>
+      <text x="100" y="198" textAnchor="middle" fill="white" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="24" letterSpacing="0.5">
+        MyStat
+      </text>
+    </svg>
+  );
+}
+
+// ─── Dark Mode Toggle Button ───
+function DarkToggle({ dark, setDark }) {
+  return (
+    <button
+      onClick={() => setDark(!dark)}
+      className={`fixed top-4 right-4 z-50 p-2 rounded-full border transition-all duration-200 ${
+        dark
+          ? "bg-gray-800 border-gray-600 text-yellow-400 hover:bg-gray-700"
+          : "bg-white border-gray-200 text-gray-500 hover:bg-gray-50 shadow-sm"
+      }`}
+      title={dark ? "Light mode" : "Dark mode"}
+    >
+      {dark ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="12" y1="21" x2="12" y2="23" /><line x1="4.22" y1="4.22" x2="5.64" y2="5.64" /><line x1="18.36" y1="18.36" x2="19.78" y2="19.78" /><line x1="1" y1="12" x2="3" y2="12" /><line x1="21" y1="12" x2="23" y2="12" /><line x1="4.22" y1="19.78" x2="5.64" y2="18.36" /><line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 // ─── Main App ───
 
 export default function ChooseMyStat() {
@@ -658,6 +718,39 @@ export default function ChooseMyStat() {
   const [useTraditional, setUseTraditional] = useState(false);
   const [showContributors, setShowContributors] = useState(false);
   const [slideDirection, setSlideDirection] = useState("forward");
+  const [dark, setDark] = useState(() => {
+    try { return window.matchMedia("(prefers-color-scheme: dark)").matches; } catch { return false; }
+  });
+
+  // ─── Apply dark mode CSS variable for result cards ───
+  useEffect(() => {
+    document.documentElement.style.setProperty("--card-bg", dark ? "#111827" : "white");
+  }, [dark]);
+
+  // ─── URL hash state: restore from hash on load, update hash on results ───
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    try {
+      const params = Object.fromEntries(new URLSearchParams(hash));
+      if (params.mode) {
+        setMode(params.mode);
+        const restored = {};
+        Object.entries(params).forEach(([k, v]) => { if (k !== "mode") restored[k] = v; });
+        setAnswers(restored);
+        setShowResults(true);
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (showResults && mode) {
+      const params = new URLSearchParams({ mode, ...answers });
+      window.location.hash = params.toString();
+    } else if (mode === null) {
+      if (window.location.hash) window.history.replaceState(null, "", window.location.pathname);
+    }
+  }, [showResults, mode, answers]);
 
   const activeSteps = mode === "descriptive" ? DESCRIPTIVE_STEPS : STEPS;
   const visibleSteps = activeSteps.filter((s) => !s.show || s.show(answers));
@@ -703,14 +796,25 @@ export default function ChooseMyStat() {
     ? (mode === "descriptive" ? recommendDescriptive(answers) : recommend(answers))
     : [];
 
+  // ─── Shared dark-mode class helpers ───
+  const bg = dark ? "bg-gray-950" : "bg-gradient-to-br from-slate-50 to-indigo-50";
+  const card = dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-100";
+  const cardHoverTeal = dark ? "hover:border-teal-500" : "hover:border-teal-400";
+  const cardHoverIndigo = dark ? "hover:border-indigo-500" : "hover:border-indigo-400";
+  const textPrimary = dark ? "text-gray-100" : "text-gray-800";
+  const textSecondary = dark ? "text-gray-400" : "text-gray-500";
+  const textMuted = dark ? "text-gray-500" : "text-gray-400";
+  const textFaint = dark ? "text-gray-600" : "text-gray-300";
+
   // ─── Home Screen ───
   if (mode === null) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-start justify-center p-4 pt-8">
+      <div className={`min-h-screen ${bg} flex items-start justify-center p-4 pt-8 transition-colors duration-300`}>
+        <DarkToggle dark={dark} setDark={setDark} />
         <div className="w-full max-w-xl">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-800">ChooseMyStat</h1>
-            <p className="text-sm text-gray-500 mt-2">
+          <div className="text-center mb-6">
+            <HexLogo dark={dark} />
+            <p className={`text-sm ${textSecondary} mt-1`}>
               Your guide to descriptive summaries, statistical tests, and SAP templates
             </p>
           </div>
@@ -718,15 +822,15 @@ export default function ChooseMyStat() {
           <div className="space-y-4">
             <button
               onClick={() => setMode("descriptive")}
-              className="w-full text-left bg-white rounded-2xl shadow-lg border-2 border-gray-100 hover:border-teal-400 hover:shadow-xl transition-all p-6 group"
+              className={`w-full text-left rounded-2xl shadow-lg border-2 ${card} ${cardHoverTeal} hover:shadow-xl transition-all p-6 group`}
             >
               <div className="flex items-start gap-4">
-                <div className="text-teal-500 group-hover:text-teal-700 transition-colors">{ICONS.describe}</div>
+                <div className="text-teal-500 group-hover:text-teal-400 transition-colors">{ICONS.describe}</div>
                 <div>
-                  <div className="text-lg font-bold text-gray-800 group-hover:text-teal-700">
+                  <div className={`text-lg font-bold ${textPrimary} group-hover:text-teal-500`}>
                     Describe My Variables
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className={`text-sm ${textSecondary} mt-1`}>
                     Get the right summary measures, SAP text, and code for your descriptive analysis and Table 1
                   </div>
                 </div>
@@ -735,15 +839,15 @@ export default function ChooseMyStat() {
 
             <button
               onClick={() => setMode("inferential")}
-              className="w-full text-left bg-white rounded-2xl shadow-lg border-2 border-gray-100 hover:border-indigo-400 hover:shadow-xl transition-all p-6 group"
+              className={`w-full text-left rounded-2xl shadow-lg border-2 ${card} ${cardHoverIndigo} hover:shadow-xl transition-all p-6 group`}
             >
               <div className="flex items-start gap-4">
-                <div className="text-indigo-400 group-hover:text-indigo-700 transition-colors">{ICONS.test}</div>
+                <div className="text-indigo-400 group-hover:text-indigo-300 transition-colors">{ICONS.test}</div>
                 <div>
-                  <div className="text-lg font-bold text-gray-800 group-hover:text-indigo-700">
+                  <div className={`text-lg font-bold ${textPrimary} group-hover:text-indigo-400`}>
                     Choose a Statistical Test
                   </div>
-                  <div className="text-sm text-gray-500 mt-1">
+                  <div className={`text-sm ${textSecondary} mt-1`}>
                     Answer a few questions about your data and get the recommended test with SAP templates, JASP steps, and R code
                   </div>
                 </div>
@@ -755,39 +859,39 @@ export default function ChooseMyStat() {
           <div className="mt-10 text-center">
             <button
               onClick={() => setShowContributors(!showContributors)}
-              className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              className={`text-xs ${textMuted} hover:text-gray-600 transition-colors`}
             >
               {showContributors ? "Hide contributors" : "Contributors"}
             </button>
             {showContributors && (
-              <div className="mt-3 bg-white rounded-xl border border-gray-200 p-4 text-left">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Contributors</p>
+              <div className={`mt-3 rounded-xl border p-4 text-left ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+                <p className={`text-xs font-semibold ${textSecondary} uppercase tracking-wide mb-3`}>Contributors</p>
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-sm">AP</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${dark ? "bg-indigo-900 text-indigo-300" : "bg-indigo-100 text-indigo-600"}`}>AP</div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">Dr Abhijit Pakhare</p>
-                      <p className="text-xs text-gray-400">Clinical Epidemiology Unit, AIIMS Bhopal</p>
+                      <p className={`text-sm font-medium ${textPrimary}`}>Dr Abhijit Pakhare</p>
+                      <p className={`text-xs ${textMuted}`}>Clinical Epidemiology Unit, AIIMS Bhopal</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-teal-600 font-bold text-sm">AJ</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${dark ? "bg-teal-900 text-teal-300" : "bg-teal-100 text-teal-600"}`}>AJ</div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">Dr Ankur Joshi</p>
-                      <p className="text-xs text-gray-400">Clinical Epidemiology Unit, AIIMS Bhopal</p>
+                      <p className={`text-sm font-medium ${textPrimary}`}>Dr Ankur Joshi</p>
+                      <p className={`text-xs ${textMuted}`}>Clinical Epidemiology Unit, AIIMS Bhopal</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-sm">AI</div>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${dark ? "bg-purple-900 text-purple-300" : "bg-purple-100 text-purple-600"}`}>AI</div>
                     <div>
-                      <p className="text-sm font-medium text-gray-800">Claude (Anthropic)</p>
-                      <p className="text-xs text-gray-400">AI assistant — decision tree, SAP templates, and code</p>
+                      <p className={`text-sm font-medium ${textPrimary}`}>Claude (Anthropic)</p>
+                      <p className={`text-xs ${textMuted}`}>AI assistant — decision tree, SAP templates, and code</p>
                     </div>
                   </div>
                 </div>
               </div>
             )}
-            <p className="text-xs text-gray-300 mt-3">
+            <p className={`text-xs ${textFaint} mt-3`}>
               AIIMS Bhopal · Clinical Epidemiology Unit
             </p>
           </div>
@@ -800,14 +904,15 @@ export default function ChooseMyStat() {
   const accentColor = mode === "descriptive" ? "teal" : "indigo";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50 flex items-start justify-center p-4 pt-8">
+    <div className={`min-h-screen ${bg} flex items-start justify-center p-4 pt-8 transition-colors duration-300`}>
+      <DarkToggle dark={dark} setDark={setDark} />
       <div className="w-full max-w-xl">
         {/* Header */}
         <div className="text-center mb-6">
-          <button onClick={handleReset} className="text-2xl font-bold text-gray-800 hover:text-indigo-600 transition-colors">
+          <button onClick={handleReset} className={`text-2xl font-bold ${textPrimary} hover:text-indigo-500 transition-colors`}>
             ChooseMyStat
           </button>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className={`text-sm ${textSecondary} mt-1`}>
             {mode === "descriptive" ? "Describe My Variables" : "Choose a Statistical Test"}
           </p>
         </div>
@@ -819,9 +924,9 @@ export default function ChooseMyStat() {
 
             {/* Question card */}
             <SlideTransition stepKey={currentStep.id} direction={slideDirection}>
-              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-4">
-                <h2 className="text-lg font-bold text-gray-800 mb-1">{currentStep.title}</h2>
-                <p className="text-sm text-gray-500 mb-5">{currentStep.subtitle}</p>
+              <div className={`rounded-2xl shadow-lg border p-6 mb-4 ${card}`}>
+                <h2 className={`text-lg font-bold ${textPrimary} mb-1`}>{currentStep.title}</h2>
+                <p className={`text-sm ${textSecondary} mb-5`}>{currentStep.subtitle}</p>
                 <div className="space-y-3">
                   {currentStep.options.map((opt) => (
                     <OptionCard
@@ -829,6 +934,7 @@ export default function ChooseMyStat() {
                       option={opt}
                       selected={answers[currentStep.id]}
                       onClick={handleSelect}
+                      dark={dark}
                     />
                   ))}
                 </div>
@@ -839,11 +945,11 @@ export default function ChooseMyStat() {
             <div className="flex justify-between items-center px-1">
               <button
                 onClick={handleBack}
-                className="text-sm text-indigo-600 font-medium hover:text-indigo-800"
+                className="text-sm text-indigo-500 font-medium hover:text-indigo-400"
               >
                 ← {stepIndex === 0 ? "Home" : "Back"}
               </button>
-              <span className="text-xs text-gray-400">
+              <span className={`text-xs ${textMuted}`}>
                 Step {stepIndex + 1} of {visibleSteps.length}
               </span>
             </div>
@@ -851,39 +957,53 @@ export default function ChooseMyStat() {
         ) : (
           <div>
             {/* Results header */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-5 mb-5">
-              <h2 className="text-lg font-bold text-gray-800 mb-1">
+            <div className={`rounded-2xl shadow-lg border p-5 mb-5 ${card}`}>
+              <h2 className={`text-lg font-bold ${textPrimary} mb-1`}>
                 {mode === "descriptive" ? "Recommended Summary" : "Recommended Analysis"}
               </h2>
-              <p className="text-sm text-gray-500 mb-1">Based on your inputs:</p>
+              <p className={`text-sm ${textSecondary} mb-1`}>Based on your inputs:</p>
               <div className="flex flex-wrap gap-2 mb-4">
                 {Object.entries(answers).map(([k, v]) => (
-                  <span key={k} className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2.5 py-1 rounded-full">
+                  <span key={k} className={`text-xs font-medium px-2.5 py-1 rounded-full ${dark ? "bg-indigo-900 text-indigo-300" : "bg-indigo-100 text-indigo-700"}`}>
                     {v.replace(/_/g, " ")}
                   </span>
                 ))}
               </div>
 
+              {/* Share link */}
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(window.location.href);
+                  alert("Link copied! Share it with your guide or batchmates.");
+                }}
+                className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg mb-3 transition-colors ${dark ? "text-indigo-300 bg-indigo-950 hover:bg-indigo-900 border border-indigo-800" : "text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100"}`}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                  <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" />
+                </svg>
+                Share this recommendation
+              </button>
+
               {/* Why this test? */}
               {mode === "inferential" && (
-                <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-3">
-                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Why this test?</p>
-                  <p className="text-sm text-indigo-900 leading-relaxed"
+                <div className={`rounded-lg px-4 py-3 mb-3 ${dark ? "bg-indigo-950 border border-indigo-800" : "bg-indigo-50 border border-indigo-100"}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${dark ? "text-indigo-400" : "text-indigo-600"}`}>Why this test?</p>
+                  <p className={`text-sm leading-relaxed ${dark ? "text-indigo-200" : "text-indigo-900"}`}
                      dangerouslySetInnerHTML={{ __html: explainReasoning(answers).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
                   />
                 </div>
               )}
 
               {mode === "inferential" && results.length > 1 && (
-                <p className="text-xs text-gray-400 italic mb-3">
+                <p className={`text-xs ${textMuted} italic mb-3`}>
                   Multiple tests: use the unadjusted test first, then the regression model for adjusted analysis.
                 </p>
               )}
 
               {/* Reporting style toggle */}
-              <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2">
-                <span className="text-xs text-gray-600 font-medium">Reporting style:</span>
-                <div className="flex items-center bg-white rounded-lg border border-gray-200 overflow-hidden">
+              <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${dark ? "bg-gray-800" : "bg-gray-50"}`}>
+                <span className={`text-xs font-medium ${dark ? "text-gray-300" : "text-gray-600"}`}>Reporting style:</span>
+                <div className={`flex items-center rounded-lg border overflow-hidden ${dark ? "bg-gray-900 border-gray-600" : "bg-white border-gray-200"}`}>
                   <button
                     onClick={() => setUseTraditional(false)}
                     className={`px-3 py-1.5 text-xs font-medium transition-colors ${
@@ -978,7 +1098,7 @@ export default function ChooseMyStat() {
 
         {/* Footer */}
         <div className="text-center mt-8 mb-4">
-          <p className="text-xs text-gray-400">AIIMS Bhopal · Clinical Epidemiology Unit</p>
+          <p className={`text-xs ${textMuted}`}>AIIMS Bhopal · Clinical Epidemiology Unit</p>
         </div>
       </div>
     </div>
