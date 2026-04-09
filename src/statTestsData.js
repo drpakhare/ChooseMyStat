@@ -913,3 +913,203 @@ export const STEPS = [
     ],
   },
 ];
+
+// ━━━ DESCRIPTIVE STATISTICS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const DESCRIPTIVES = {
+  continuous_normal: {
+    name: "Continuous Variable (Normal)",
+    summary: "Mean ± SD",
+    visual: "Histogram with normal curve, Box plot",
+    sap: `Continuous variables that are normally distributed will be summarised as mean ± standard deviation (SD). Normality will be assessed using the Shapiro-Wilk test and visual inspection of histograms and Q-Q plots. For skewed variables, median (interquartile range, IQR) will be used instead (see below).`,
+    sapTraditional: `Normally distributed continuous variables will be expressed as mean ± SD. Normality will be assessed using the Shapiro-Wilk test. Non-normal variables will be expressed as median (IQR).`,
+    jasp: `For descriptive tables:\nAnalyses → Descriptives → Descriptive Statistics\n\n1. Move continuous variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Mean, Median\n   • Dispersion: Std. Deviation, IQR, Range, Minimum, Maximum\n   • Distribution: Skewness, Kurtosis\n3. Under "Plots," check:\n   • Distribution plots (histogram)\n   • Box plots\n   • Q-Q plots`,
+    r: `library(tidyverse)
+library(gtsummary)
+
+# ── Publication-ready Table 1 ──
+df |>
+  select(age, bmi, sbp, hba1c) |>
+  tbl_summary(
+    type = everything() ~ "continuous",
+    statistic = all_continuous() ~ "{mean} ({sd})",
+    digits = all_continuous() ~ 1
+  ) |>
+  add_n() |>
+  modify_header(label = "**Variable**")
+
+# ── Normality check ──
+df |>
+  select(where(is.numeric)) |>
+  pivot_longer(everything()) |>
+  group_by(name) |>
+  summarise(
+    shapiro_p = shapiro.test(value)$p.value,
+    skewness  = e1071::skewness(value),
+    .groups   = "drop"
+  )
+
+# ── Histogram + Q-Q plot ──
+ggplot(df, aes(x = outcome)) +
+  geom_histogram(aes(y = after_stat(density)),
+    bins = 20, fill = "steelblue", alpha = 0.7) +
+  geom_density(colour = "red") +
+  theme_minimal()
+
+ggplot(df, aes(sample = outcome)) +
+  stat_qq() + stat_qq_line(colour = "red") +
+  theme_minimal()`
+  },
+
+  continuous_skewed: {
+    name: "Continuous Variable (Skewed / Non-Normal)",
+    summary: "Median (IQR) or Median (P25–P75)",
+    visual: "Histogram, Box plot, Violin plot",
+    sap: `Continuous variables that are not normally distributed will be summarised as median (interquartile range, IQR: 25th–75th percentile). Range (minimum–maximum) will also be reported. For variables with extreme outliers, the median is preferred as it is robust to outlying values.`,
+    sapTraditional: `Non-normally distributed continuous variables will be expressed as median (IQR). Range will also be reported where relevant.`,
+    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Median\n   • Dispersion: IQR, Range, Minimum, Maximum\n   • Percentile Values: Quartiles (25th, 75th)\n3. Under "Plots," check Box plots and Distribution plots`,
+    r: `library(tidyverse)
+library(gtsummary)
+
+# ── Table with median (IQR) ──
+df |>
+  select(hospital_stay, pain_score, cost) |>
+  tbl_summary(
+    type = everything() ~ "continuous",
+    statistic = all_continuous() ~ "{median} ({p25}, {p75})",
+    digits = all_continuous() ~ 1
+  )
+
+# ── Box plot + violin ──
+ggplot(df, aes(x = group, y = outcome)) +
+  geom_violin(fill = "lightblue", alpha = 0.5) +
+  geom_boxplot(width = 0.2, fill = "white") +
+  theme_minimal()`
+  },
+
+  categorical: {
+    name: "Categorical / Binary Variable",
+    summary: "Frequency (n) and Percentage (%)",
+    visual: "Bar chart, Pie chart (≤ 5 categories)",
+    sap: `Categorical variables will be summarised as frequency and percentage (%). Binary variables will be reported as the count and proportion of the outcome of interest. Percentages will be calculated over non-missing values; the number of missing observations will be noted separately.`,
+    sapTraditional: `Categorical variables will be expressed as frequency and percentage (%).`,
+    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move categorical variables into "Variables"\n2. Under "Statistics," check:\n   • Frequency tables: On\n3. Under "Plots," check:\n   • Bar plots\n   • Pie charts (for ≤ 5 categories)\n\nAlternatively:\nAnalyses → Frequencies → Contingency Tables\nfor cross-tabulations of two categorical variables`,
+    r: `library(tidyverse)
+library(gtsummary)
+
+# ── Frequency table ──
+df |>
+  select(gender, smoking, disease_stage) |>
+  tbl_summary(
+    statistic = all_categorical() ~ "{n} ({p}%)",
+    digits = all_categorical() ~ c(0, 1)
+  )
+
+# ── Bar chart ──
+ggplot(df, aes(x = fct_infreq(disease_stage), fill = disease_stage)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label = after_stat(count)),
+            vjust = -0.5) +
+  labs(x = "Disease Stage", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")`
+  },
+
+  table_one: {
+    name: "Baseline / Table 1 (by group)",
+    summary: "Stratified summary of all baseline variables by study group",
+    visual: "Publication-ready Table 1",
+    sap: `Baseline characteristics will be summarised by study group. Continuous variables will be expressed as mean ± SD (if normally distributed) or median (IQR) (if skewed). Categorical variables will be expressed as frequency (%). The standardised mean difference (SMD) or p-values from appropriate bivariate tests may be reported to characterise balance across groups.`,
+    sapTraditional: `Baseline characteristics will be presented as Table 1, stratified by group. Continuous variables will be expressed as mean ± SD or median (IQR), and categorical variables as n (%). P-values from bivariate tests will indicate differences between groups.`,
+    jasp: `JASP does not generate a combined Table 1 directly.\n\nWorkaround:\n1. Analyses → Descriptives → Descriptive Statistics\n   • Split by your grouping variable\n   • Check all relevant statistics\n2. Combine with Contingency Tables for categorical variables\n\nFor a true Table 1, use R (gtsummary) — see the R tab.`,
+    r: `library(gtsummary)
+library(tidyverse)
+
+# ── The classic Table 1 ──
+df |>
+  select(group, age, sex, bmi, smoking, disease_stage,
+         sbp, hba1c) |>
+  tbl_summary(
+    by = group,
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = all_continuous() ~ 1,
+    missing = "ifany"        # show missing counts
+  ) |>
+  add_p() |>               # bivariate p-values
+  add_overall() |>          # total column
+  add_n() |>                # sample size per variable
+  modify_header(label = "**Characteristic**") |>
+  bold_labels()
+
+# ── With SMD instead of p-values ──
+library(tableone)
+vars <- c("age", "sex", "bmi", "smoking", "disease_stage")
+CreateTableOne(vars = vars, strata = "group",
+  data = df, test = FALSE, smd = TRUE)
+
+# ── Export to Word/Excel ──
+tbl <- df |> tbl_summary(by = group) |> add_p()
+# To Word:
+tbl |> as_flex_table() |> flextable::save_as_docx(path = "table1.docx")
+# To Excel:
+tbl |> as_tibble() |> writexl::write_xlsx("table1.xlsx")`
+  }
+};
+
+export const DESCRIPTIVE_STEPS = [
+  {
+    id: "desc_goal",
+    title: "What do you want to summarise?",
+    subtitle: "Pick the type of descriptive analysis you need",
+    options: [
+      { value: "single_continuous", label: "A continuous variable", desc: "BP, HbA1c, weight, hospital stay, score", icon: "desc_continuous" },
+      { value: "single_categorical", label: "A categorical / binary variable", desc: "Gender, disease stage, Yes/No outcome", icon: "desc_categorical" },
+      { value: "table_one", label: "Baseline table (Table 1)", desc: "Summarise all variables by study group", icon: "table" },
+    ],
+  },
+  {
+    id: "desc_distribution",
+    title: "Is your continuous variable normally distributed?",
+    subtitle: "Check with histogram, Q-Q plot, or Shapiro-Wilk test",
+    show: (a) => a.desc_goal === "single_continuous",
+    options: [
+      { value: "normal", label: "Yes, Normal", desc: "Bell-shaped, Shapiro-Wilk p > 0.05", icon: "normal" },
+      { value: "skewed", label: "No, Skewed", desc: "Non-normal, Shapiro-Wilk p < 0.05", icon: "skewed" },
+      { value: "not_sure", label: "Not sure yet", desc: "I'll check — show me how to assess normality", icon: "not_sure" },
+    ],
+  },
+];
+
+export function explainReasoning(answers) {
+  const { outcome, comparison, distribution, adjust, sampleSize } = answers;
+  const parts = [];
+
+  const outcomeLabels = { continuous: "continuous", binary: "binary", categorical: "ordered categorical (3+ levels)", time_to_event: "time-to-event (survival)" };
+  const compLabels = { two_independent: "two independent groups", two_paired: "paired/before-after measurements", three_plus: "three or more independent groups", correlation: "association between two variables", single: "a single group vs. a known reference" };
+
+  if (outcome) parts.push(`Your outcome is **${outcomeLabels[outcome] || outcome}**`);
+  if (comparison) parts.push(`with **${compLabels[comparison] || comparison}**`);
+  if (distribution === "normal") parts.push("and the data is **normally distributed**");
+  if (distribution === "skewed") parts.push("and the data is **not normally distributed**");
+  if (sampleSize === "small") parts.push("with a **small sample size** (expected cell count < 5)");
+  if (adjust === "yes") parts.push("You also need to **adjust for confounders**, so a regression model is added.");
+  else if (adjust === "no") parts.push("No confounder adjustment is needed.");
+
+  return parts.join(", ").replace(/,([^,]*)$/, ".$1") || "";
+}
+
+export function recommendDescriptive(answers) {
+  const { desc_goal, desc_distribution } = answers;
+  if (desc_goal === "table_one") return ["table_one"];
+  if (desc_goal === "single_categorical") return ["categorical"];
+  if (desc_goal === "single_continuous") {
+    if (desc_distribution === "normal") return ["continuous_normal"];
+    if (desc_distribution === "skewed") return ["continuous_skewed"];
+    // "not_sure" → show both so they can decide after checking
+    return ["continuous_normal", "continuous_skewed"];
+  }
+  return [];
+}

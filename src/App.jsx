@@ -1,203 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { TESTS, STEPS, recommend } from "./statTestsData";
-
-const DESCRIPTIVES = {
-  continuous_normal: {
-    name: "Continuous Variable (Normal)",
-    summary: "Mean ± SD",
-    visual: "Histogram with normal curve, Box plot",
-    sap: `Continuous variables that are normally distributed will be summarised as mean ± standard deviation (SD). Normality will be assessed using the Shapiro-Wilk test and visual inspection of histograms and Q-Q plots. For skewed variables, median (interquartile range, IQR) will be used instead (see below).`,
-    sapTraditional: `Normally distributed continuous variables will be expressed as mean ± SD. Normality will be assessed using the Shapiro-Wilk test. Non-normal variables will be expressed as median (IQR).`,
-    jasp: `For descriptive tables:\nAnalyses → Descriptives → Descriptive Statistics\n\n1. Move continuous variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Mean, Median\n   • Dispersion: Std. Deviation, IQR, Range, Minimum, Maximum\n   • Distribution: Skewness, Kurtosis\n3. Under "Plots," check:\n   • Distribution plots (histogram)\n   • Box plots\n   • Q-Q plots`,
-    r: `library(tidyverse)
-library(gtsummary)
-
-# ── Publication-ready Table 1 ──
-df |>
-  select(age, bmi, sbp, hba1c) |>
-  tbl_summary(
-    type = everything() ~ "continuous",
-    statistic = all_continuous() ~ "{mean} ({sd})",
-    digits = all_continuous() ~ 1
-  ) |>
-  add_n() |>
-  modify_header(label = "**Variable**")
-
-# ── Normality check ──
-df |>
-  select(where(is.numeric)) |>
-  pivot_longer(everything()) |>
-  group_by(name) |>
-  summarise(
-    shapiro_p = shapiro.test(value)$p.value,
-    skewness  = e1071::skewness(value),
-    .groups   = "drop"
-  )
-
-# ── Histogram + Q-Q plot ──
-ggplot(df, aes(x = outcome)) +
-  geom_histogram(aes(y = after_stat(density)),
-    bins = 20, fill = "steelblue", alpha = 0.7) +
-  geom_density(colour = "red") +
-  theme_minimal()
-
-ggplot(df, aes(sample = outcome)) +
-  stat_qq() + stat_qq_line(colour = "red") +
-  theme_minimal()`
-  },
-
-  continuous_skewed: {
-    name: "Continuous Variable (Skewed / Non-Normal)",
-    summary: "Median (IQR) or Median (P25–P75)",
-    visual: "Histogram, Box plot, Violin plot",
-    sap: `Continuous variables that are not normally distributed will be summarised as median (interquartile range, IQR: 25th–75th percentile). Range (minimum–maximum) will also be reported. For variables with extreme outliers, the median is preferred as it is robust to outlying values.`,
-    sapTraditional: `Non-normally distributed continuous variables will be expressed as median (IQR). Range will also be reported where relevant.`,
-    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Median\n   • Dispersion: IQR, Range, Minimum, Maximum\n   • Percentile Values: Quartiles (25th, 75th)\n3. Under "Plots," check Box plots and Distribution plots`,
-    r: `library(tidyverse)
-library(gtsummary)
-
-# ── Table with median (IQR) ──
-df |>
-  select(hospital_stay, pain_score, cost) |>
-  tbl_summary(
-    type = everything() ~ "continuous",
-    statistic = all_continuous() ~ "{median} ({p25}, {p75})",
-    digits = all_continuous() ~ 1
-  )
-
-# ── Box plot + violin ──
-ggplot(df, aes(x = group, y = outcome)) +
-  geom_violin(fill = "lightblue", alpha = 0.5) +
-  geom_boxplot(width = 0.2, fill = "white") +
-  theme_minimal()`
-  },
-
-  categorical: {
-    name: "Categorical / Binary Variable",
-    summary: "Frequency (n) and Percentage (%)",
-    visual: "Bar chart, Pie chart (≤ 5 categories)",
-    sap: `Categorical variables will be summarised as frequency and percentage (%). Binary variables will be reported as the count and proportion of the outcome of interest. Percentages will be calculated over non-missing values; the number of missing observations will be noted separately.`,
-    sapTraditional: `Categorical variables will be expressed as frequency and percentage (%).`,
-    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move categorical variables into "Variables"\n2. Under "Statistics," check:\n   • Frequency tables: On\n3. Under "Plots," check:\n   • Bar plots\n   • Pie charts (for ≤ 5 categories)\n\nAlternatively:\nAnalyses → Frequencies → Contingency Tables\nfor cross-tabulations of two categorical variables`,
-    r: `library(tidyverse)
-library(gtsummary)
-
-# ── Frequency table ──
-df |>
-  select(gender, smoking, disease_stage) |>
-  tbl_summary(
-    statistic = all_categorical() ~ "{n} ({p}%)",
-    digits = all_categorical() ~ c(0, 1)
-  )
-
-# ── Bar chart ──
-ggplot(df, aes(x = fct_infreq(disease_stage), fill = disease_stage)) +
-  geom_bar() +
-  geom_text(stat = "count", aes(label = after_stat(count)),
-            vjust = -0.5) +
-  labs(x = "Disease Stage", y = "Count") +
-  theme_minimal() +
-  theme(legend.position = "none")`
-  },
-
-  table_one: {
-    name: "Baseline / Table 1 (by group)",
-    summary: "Stratified summary of all baseline variables by study group",
-    visual: "Publication-ready Table 1",
-    sap: `Baseline characteristics will be summarised by study group. Continuous variables will be expressed as mean ± SD (if normally distributed) or median (IQR) (if skewed). Categorical variables will be expressed as frequency (%). The standardised mean difference (SMD) or p-values from appropriate bivariate tests may be reported to characterise balance across groups.`,
-    sapTraditional: `Baseline characteristics will be presented as Table 1, stratified by group. Continuous variables will be expressed as mean ± SD or median (IQR), and categorical variables as n (%). P-values from bivariate tests will indicate differences between groups.`,
-    jasp: `JASP does not generate a combined Table 1 directly.\n\nWorkaround:\n1. Analyses → Descriptives → Descriptive Statistics\n   • Split by your grouping variable\n   • Check all relevant statistics\n2. Combine with Contingency Tables for categorical variables\n\nFor a true Table 1, use R (gtsummary) — see the R tab.`,
-    r: `library(gtsummary)
-library(tidyverse)
-
-# ── The classic Table 1 ──
-df |>
-  select(group, age, sex, bmi, smoking, disease_stage,
-         sbp, hba1c) |>
-  tbl_summary(
-    by = group,
-    statistic = list(
-      all_continuous()  ~ "{mean} ({sd})",
-      all_categorical() ~ "{n} ({p}%)"
-    ),
-    digits = all_continuous() ~ 1,
-    missing = "ifany"        # show missing counts
-  ) |>
-  add_p() |>               # bivariate p-values
-  add_overall() |>          # total column
-  add_n() |>                # sample size per variable
-  modify_header(label = "**Characteristic**") |>
-  bold_labels()
-
-# ── With SMD instead of p-values ──
-library(tableone)
-vars <- c("age", "sex", "bmi", "smoking", "disease_stage")
-CreateTableOne(vars = vars, strata = "group",
-  data = df, test = FALSE, smd = TRUE)
-
-# ── Export to Word/Excel ──
-tbl <- df |> tbl_summary(by = group) |> add_p()
-# To Word:
-tbl |> as_flex_table() |> flextable::save_as_docx(path = "table1.docx")
-# To Excel:
-tbl |> as_tibble() |> writexl::write_xlsx("table1.xlsx")`
-  }
-};
-
-const DESCRIPTIVE_STEPS = [
-  {
-    id: "desc_goal",
-    title: "What do you want to summarise?",
-    subtitle: "Pick the type of descriptive analysis you need",
-    options: [
-      { value: "single_continuous", label: "A continuous variable", desc: "BP, HbA1c, weight, hospital stay, score", icon: "desc_continuous" },
-      { value: "single_categorical", label: "A categorical / binary variable", desc: "Gender, disease stage, Yes/No outcome", icon: "desc_categorical" },
-      { value: "table_one", label: "Baseline table (Table 1)", desc: "Summarise all variables by study group", icon: "table" },
-    ],
-  },
-  {
-    id: "desc_distribution",
-    title: "Is your continuous variable normally distributed?",
-    subtitle: "Check with histogram, Q-Q plot, or Shapiro-Wilk test",
-    show: (a) => a.desc_goal === "single_continuous",
-    options: [
-      { value: "normal", label: "Yes, Normal", desc: "Bell-shaped, Shapiro-Wilk p > 0.05", icon: "normal" },
-      { value: "skewed", label: "No, Skewed", desc: "Non-normal, Shapiro-Wilk p < 0.05", icon: "skewed" },
-      { value: "not_sure", label: "Not sure yet", desc: "I'll check — show me how to assess normality", icon: "not_sure" },
-    ],
-  },
-];
-
-function explainReasoning(answers) {
-  const { outcome, comparison, distribution, adjust, sampleSize } = answers;
-  const parts = [];
-
-  const outcomeLabels = { continuous: "continuous", binary: "binary", categorical: "ordered categorical (3+ levels)", time_to_event: "time-to-event (survival)" };
-  const compLabels = { two_independent: "two independent groups", two_paired: "paired/before-after measurements", three_plus: "three or more independent groups", correlation: "association between two variables", single: "a single group vs. a known reference" };
-
-  if (outcome) parts.push(`Your outcome is **${outcomeLabels[outcome] || outcome}**`);
-  if (comparison) parts.push(`with **${compLabels[comparison] || comparison}**`);
-  if (distribution === "normal") parts.push("and the data is **normally distributed**");
-  if (distribution === "skewed") parts.push("and the data is **not normally distributed**");
-  if (sampleSize === "small") parts.push("with a **small sample size** (expected cell count < 5)");
-  if (adjust === "yes") parts.push("You also need to **adjust for confounders**, so a regression model is added.");
-  else if (adjust === "no") parts.push("No confounder adjustment is needed.");
-
-  return parts.join(", ").replace(/,([^,]*)$/, ".$1") || "";
-}
-
-function recommendDescriptive(answers) {
-  const { desc_goal, desc_distribution } = answers;
-  if (desc_goal === "table_one") return ["table_one"];
-  if (desc_goal === "single_categorical") return ["categorical"];
-  if (desc_goal === "single_continuous") {
-    if (desc_distribution === "normal") return ["continuous_normal"];
-    if (desc_distribution === "skewed") return ["continuous_skewed"];
-    // "not_sure" → show both so they can decide after checking
-    return ["continuous_normal", "continuous_skewed"];
-  }
-  return [];
-}
+import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive } from "./statTestsData";
 
 // ─── UI Components ───
 
@@ -729,6 +531,11 @@ export default function ChooseMyStat() {
   const [useTraditional, setUseTraditional] = useState(false);
   const [showContributors, setShowContributors] = useState(false);
   const [slideDirection, setSlideDirection] = useState("forward");
+  // ─── Analysis Plan Builder (session memory) ───
+  const [planItems, setPlanItems] = useState([]);
+  const [showPlan, setShowPlan] = useState(false);
+  const [planTitle, setPlanTitle] = useState("");
+  const [planDesign, setPlanDesign] = useState("");
   const [dark, setDark] = useState(() => {
     try { return window.matchMedia("(prefers-color-scheme: dark)").matches; } catch { return false; }
   });
@@ -803,6 +610,85 @@ export default function ChooseMyStat() {
     setShowResults(false);
   };
 
+  // ─── Plan Builder helpers ───
+  const addToPlan = () => {
+    const curResults = mode === "descriptive" ? recommendDescriptive(answers) : recommend(answers);
+    const item = {
+      id: Date.now(),
+      mode,
+      answers: { ...answers },
+      resultKeys: curResults,
+      useTraditional,
+      reasoning: mode === "inferential" ? explainReasoning(answers) : null,
+    };
+    setPlanItems((prev) => [...prev, item]);
+    setShowPlan(true);
+  };
+
+  const removePlanItem = (id) => setPlanItems((prev) => prev.filter((p) => p.id !== id));
+
+  const movePlanItem = (idx, dir) => {
+    setPlanItems((prev) => {
+      const a = [...prev];
+      const ni = idx + dir;
+      if (ni < 0 || ni >= a.length) return a;
+      [a[idx], a[ni]] = [a[ni], a[idx]];
+      return a;
+    });
+  };
+
+  const generateConsolidatedSAP = () => {
+    const sep = "═".repeat(50);
+    const lines = [
+      sep,
+      "CONSOLIDATED STATISTICAL ANALYSIS PLAN",
+      sep,
+      "",
+    ];
+    if (planTitle) lines.push(`Study Title: ${planTitle}`, "");
+    if (planDesign) lines.push(`Study Design: ${planDesign}`, "");
+    lines.push(`Date: ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}`, "");
+    lines.push(`Total objectives/analyses: ${planItems.length}`, "");
+    lines.push("─".repeat(50), "");
+
+    planItems.forEach((item, i) => {
+      const num = i + 1;
+      const testData = item.mode === "descriptive"
+        ? item.resultKeys.map((k) => DESCRIPTIVES[k])
+        : item.resultKeys.map((k) => TESTS[k]);
+      const inputStr = Object.entries(item.answers).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v.replace(/_/g, " ")}`).join(", ");
+
+      lines.push(`OBJECTIVE ${num}`, "─".repeat(30));
+      lines.push(`Type: ${item.mode === "descriptive" ? "Descriptive Analysis" : "Inferential Test"}`);
+      lines.push(`Inputs: ${inputStr}`);
+      if (item.reasoning) lines.push(`Reasoning: ${item.reasoning.replace(/\*\*/g, "")}`);
+      lines.push("");
+
+      testData.forEach((t) => {
+        if (!t) return;
+        lines.push(`  Test/Method: ${t.name}`);
+        lines.push(`  SAP Template:`);
+        const sap = item.useTraditional ? (t.sapTraditional || t.sap) : t.sap;
+        lines.push(`    ${sap}`);
+        lines.push("");
+        if (t.report) lines.push(`  Reporting: ${t.report}`, "");
+        if (t.r) lines.push(`  R Code:`, `    ${t.r.split("\n").join("\n    ")}`, "");
+        if (t.jasp) lines.push(`  JASP:`, `    ${t.jasp.split("\n").join("\n    ")}`, "");
+      });
+      lines.push("");
+    });
+
+    lines.push("─".repeat(50));
+    lines.push("Generated by ChooseMyStat · Clinical Epidemiology Unit, AIIMS Bhopal");
+    lines.push("https://choose-my-stat.vercel.app");
+
+    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `SAP_${planTitle ? planTitle.replace(/\s+/g, "_").slice(0, 30) : "ConsolidatedPlan"}.txt`;
+    a.click();
+  };
+
   const results = showResults
     ? (mode === "descriptive" ? recommendDescriptive(answers) : recommend(answers))
     : [];
@@ -866,6 +752,95 @@ export default function ChooseMyStat() {
             </button>
           </div>
 
+          {/* ─── Plan Builder Panel ─── */}
+          {planItems.length > 0 && (
+            <div className={`mt-6 rounded-2xl border-2 shadow-lg p-5 ${dark ? "bg-emerald-950 border-emerald-800" : "bg-emerald-50 border-emerald-200"}`}>
+              <button
+                onClick={() => setShowPlan(!showPlan)}
+                className="w-full flex items-center justify-between"
+              >
+                <div className="flex items-center gap-2">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`w-5 h-5 ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                    <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                    <rect x="9" y="3" width="6" height="4" rx="1" />
+                    <path d="M9 14l2 2 4-4" />
+                  </svg>
+                  <span className={`text-sm font-bold ${dark ? "text-emerald-300" : "text-emerald-800"}`}>
+                    Analysis Plan ({planItems.length} {planItems.length === 1 ? "item" : "items"})
+                  </span>
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-4 h-4 transition-transform ${showPlan ? "rotate-180" : ""} ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+
+              {showPlan && (
+                <div className="mt-4 space-y-3">
+                  {/* Study header inputs */}
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={planTitle}
+                      onChange={(e) => setPlanTitle(e.target.value)}
+                      placeholder="Study title (optional)"
+                      className={`w-full text-sm rounded-lg px-3 py-2 border outline-none focus:ring-2 focus:ring-emerald-400 ${dark ? "bg-gray-900 border-gray-700 text-gray-200 placeholder-gray-600" : "bg-white border-gray-200 text-gray-800 placeholder-gray-400"}`}
+                    />
+                    <input
+                      type="text"
+                      value={planDesign}
+                      onChange={(e) => setPlanDesign(e.target.value)}
+                      placeholder="Study design, e.g. Cross-sectional, RCT (optional)"
+                      className={`w-full text-sm rounded-lg px-3 py-2 border outline-none focus:ring-2 focus:ring-emerald-400 ${dark ? "bg-gray-900 border-gray-700 text-gray-200 placeholder-gray-600" : "bg-white border-gray-200 text-gray-800 placeholder-gray-400"}`}
+                    />
+                  </div>
+
+                  {/* Saved items list */}
+                  <div className="space-y-2">
+                    {planItems.map((item, idx) => {
+                      const testNames = item.mode === "descriptive"
+                        ? item.resultKeys.map((k) => DESCRIPTIVES[k]?.name || k)
+                        : item.resultKeys.map((k) => TESTS[k]?.name || k);
+                      return (
+                        <div key={item.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${dark ? "bg-gray-900" : "bg-white"}`}>
+                          <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${dark ? "bg-emerald-900 text-emerald-300" : "bg-emerald-200 text-emerald-700"}`}>{idx + 1}</span>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-medium truncate ${dark ? "text-gray-200" : "text-gray-800"}`}>{testNames.join(", ")}</p>
+                            <p className={`text-xs truncate ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                              {item.mode === "descriptive" ? "Descriptive" : "Inferential"} · {Object.values(item.answers).join(" → ")}
+                            </p>
+                          </div>
+                          <div className="flex gap-1 flex-shrink-0">
+                            <button onClick={() => movePlanItem(idx, -1)} disabled={idx === 0} className={`p-1 rounded text-xs ${idx === 0 ? "opacity-30" : "hover:bg-gray-200"} ${dark ? "text-gray-400" : "text-gray-500"}`}>↑</button>
+                            <button onClick={() => movePlanItem(idx, 1)} disabled={idx === planItems.length - 1} className={`p-1 rounded text-xs ${idx === planItems.length - 1 ? "opacity-30" : "hover:bg-gray-200"} ${dark ? "text-gray-400" : "text-gray-500"}`}>↓</button>
+                            <button onClick={() => removePlanItem(item.id)} className="p-1 rounded text-xs text-red-400 hover:text-red-600 hover:bg-red-50">✕</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Download consolidated plan */}
+                  <button
+                    onClick={generateConsolidatedSAP}
+                    className={`w-full flex items-center justify-center gap-2 text-sm font-semibold px-4 py-3 rounded-xl transition-colors shadow-sm ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download Consolidated SAP
+                  </button>
+
+                  <button
+                    onClick={() => { setPlanItems([]); setShowPlan(false); setPlanTitle(""); setPlanDesign(""); }}
+                    className={`w-full text-xs font-medium py-2 rounded-lg transition-colors ${dark ? "text-gray-500 hover:text-red-400" : "text-gray-400 hover:text-red-500"}`}
+                  >
+                    Clear entire plan
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Contributors */}
           <div className="mt-10 text-center">
             <button
@@ -926,6 +901,18 @@ export default function ChooseMyStat() {
           <p className={`text-sm ${textSecondary} mt-1`}>
             {mode === "descriptive" ? "Describe My Variables" : "Choose a Statistical Test"}
           </p>
+          {planItems.length > 0 && (
+            <button
+              onClick={() => { handleReset(); setShowPlan(true); }}
+              className={`inline-flex items-center gap-1.5 mt-2 text-xs font-medium px-3 py-1.5 rounded-full transition-colors ${dark ? "bg-emerald-900 text-emerald-300 hover:bg-emerald-800" : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2" />
+                <rect x="9" y="3" width="6" height="4" rx="1" />
+              </svg>
+              Plan: {planItems.length} {planItems.length === 1 ? "item" : "items"}
+            </button>
+          )}
         </div>
 
         {!showResults ? (
@@ -1055,53 +1042,67 @@ export default function ChooseMyStat() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-between items-center mt-5 px-1">
-              <button onClick={handleBack} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
-                ← Back
+            <div className="mt-5 px-1 space-y-3">
+              {/* Add to Plan — primary action */}
+              <button
+                onClick={() => { addToPlan(); handleReset(); }}
+                className={`w-full flex items-center justify-center gap-2 text-sm font-semibold px-4 py-3 rounded-xl transition-colors shadow-sm ${dark ? "bg-emerald-700 hover:bg-emerald-600 text-white" : "bg-emerald-600 hover:bg-emerald-700 text-white"}`}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+                Add to Analysis Plan & Continue
+                {planItems.length > 0 && (
+                  <span className="ml-1 bg-white/20 text-xs font-bold px-2 py-0.5 rounded-full">{planItems.length} saved</span>
+                )}
               </button>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    const testData = mode === "descriptive"
-                      ? results.map((k) => DESCRIPTIVES[k])
-                      : results.map((k) => TESTS[k]);
-                    const lines = [
-                      "ChooseMyStat — Recommendation",
-                      "=" .repeat(40),
-                      "",
-                      "Your inputs: " + Object.values(answers).join(" → "),
-                      "",
-                      ...testData.flatMap((t) => [
-                        `TEST: ${t.name}`,
-                        "-".repeat(30),
-                        "SAP Template:",
-                        useTraditional ? (t.sapTraditional || t.sap) : t.sap,
-                        "",
-                        ...(t.r ? ["R Code:", t.r, ""] : []),
-                        ...(t.jasp ? ["JASP Path:", t.jasp, ""] : []),
-                        "",
-                      ]),
-                      "Generated by ChooseMyStat · Clinical Epidemiology Unit, AIIMS Bhopal",
-                    ];
-                    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
-                    const a = document.createElement("a");
-                    a.href = URL.createObjectURL(blob);
-                    a.download = `ChooseMyStat_${results[0] || "recommendation"}.txt`;
-                    a.click();
-                  }}
-                  className="flex items-center gap-1.5 text-sm text-gray-500 font-medium px-3 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Save
+
+              <div className="flex justify-between items-center">
+                <button onClick={handleBack} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
+                  ← Back
                 </button>
-                <button
-                  onClick={handleReset}
-                  className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
-                >
-                  Start Over
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      const testData = mode === "descriptive"
+                        ? results.map((k) => DESCRIPTIVES[k])
+                        : results.map((k) => TESTS[k]);
+                      const lines = [
+                        "ChooseMyStat — Recommendation",
+                        "=" .repeat(40),
+                        "",
+                        "Your inputs: " + Object.values(answers).join(" → "),
+                        "",
+                        ...testData.flatMap((t) => [
+                          `TEST: ${t.name}`,
+                          "-".repeat(30),
+                          "SAP Template:",
+                          useTraditional ? (t.sapTraditional || t.sap) : t.sap,
+                          "",
+                          ...(t.r ? ["R Code:", t.r, ""] : []),
+                          ...(t.jasp ? ["JASP Path:", t.jasp, ""] : []),
+                          "",
+                        ]),
+                        "Generated by ChooseMyStat · Clinical Epidemiology Unit, AIIMS Bhopal",
+                      ];
+                      const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+                      const a = document.createElement("a");
+                      a.href = URL.createObjectURL(blob);
+                      a.download = `ChooseMyStat_${results[0] || "recommendation"}.txt`;
+                      a.click();
+                    }}
+                    className={`flex items-center gap-1.5 text-sm font-medium px-3 py-2.5 rounded-xl border transition-colors ${dark ? "text-gray-400 border-gray-700 hover:bg-gray-800 hover:text-gray-200" : "text-gray-500 border-gray-200 hover:bg-gray-50 hover:text-gray-700"}`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Save this only
+                  </button>
+                  <button
+                    onClick={handleReset}
+                    className={`text-sm font-medium px-5 py-2.5 rounded-xl transition-colors shadow-sm ${dark ? "bg-gray-700 text-gray-200 hover:bg-gray-600" : "bg-gray-200 text-gray-700 hover:bg-gray-300"}`}
+                  >
+                    Start Over
+                  </button>
+                </div>
               </div>
             </div>
           </div>
