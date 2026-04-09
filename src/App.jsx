@@ -150,9 +150,9 @@ const DESCRIPTIVE_STEPS = [
     title: "What do you want to summarise?",
     subtitle: "Pick the type of descriptive analysis you need",
     options: [
-      { value: "single_continuous", label: "A continuous variable", desc: "BP, HbA1c, weight, hospital stay, score", icon: "📏" },
-      { value: "single_categorical", label: "A categorical / binary variable", desc: "Gender, disease stage, Yes/No outcome", icon: "📊" },
-      { value: "table_one", label: "Baseline table (Table 1)", desc: "Summarise all variables by study group", icon: "📋" },
+      { value: "single_continuous", label: "A continuous variable", desc: "BP, HbA1c, weight, hospital stay, score", icon: "desc_continuous" },
+      { value: "single_categorical", label: "A categorical / binary variable", desc: "Gender, disease stage, Yes/No outcome", icon: "desc_categorical" },
+      { value: "table_one", label: "Baseline table (Table 1)", desc: "Summarise all variables by study group", icon: "table" },
     ],
   },
   {
@@ -161,9 +161,9 @@ const DESCRIPTIVE_STEPS = [
     subtitle: "Check with histogram, Q-Q plot, or Shapiro-Wilk test",
     show: (a) => a.desc_goal === "single_continuous",
     options: [
-      { value: "normal", label: "Yes, Normal", desc: "Bell-shaped, Shapiro-Wilk p > 0.05", icon: "📐" },
-      { value: "skewed", label: "No, Skewed", desc: "Non-normal, Shapiro-Wilk p < 0.05", icon: "📉" },
-      { value: "not_sure", label: "Not sure yet", desc: "I'll check — show me how to assess normality", icon: "❓" },
+      { value: "normal", label: "Yes, Normal", desc: "Bell-shaped, Shapiro-Wilk p > 0.05", icon: "normal" },
+      { value: "skewed", label: "No, Skewed", desc: "Non-normal, Shapiro-Wilk p < 0.05", icon: "skewed" },
+      { value: "not_sure", label: "Not sure yet", desc: "I'll check — show me how to assess normality", icon: "not_sure" },
     ],
   },
 ];
@@ -224,6 +224,122 @@ function CopyButton({ text }) {
   );
 }
 
+// ─── SVG Icon set (24×24, consistent stroke style) ───
+const ICONS = {
+  // Outcome types
+  continuous: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M3 12h2l3-7 4 14 3-7h6" />
+    </svg>
+  ),
+  binary: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="8" cy="12" r="3" /><circle cx="16" cy="12" r="3" /><path d="M11 12h2" />
+    </svg>
+  ),
+  categorical: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <rect x="4" y="14" width="4" height="6" rx="1" /><rect x="10" y="8" width="4" height="12" rx="1" /><rect x="16" y="4" width="4" height="16" rx="1" />
+    </svg>
+  ),
+  time_to_event: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
+    </svg>
+  ),
+  // Comparison types
+  two_independent: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M4 20c0-3 2-5 4-5s4 2 4 5" /><path d="M12 20c0-3 2-5 4-5s4 2 4 5" />
+    </svg>
+  ),
+  two_paired: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M17 1l4 4-4 4" /><path d="M3 11V9a4 4 0 014-4h14" /><path d="M7 23l-4-4 4-4" /><path d="M21 13v2a4 4 0 01-4 4H3" />
+    </svg>
+  ),
+  three_plus: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="6" cy="8" r="2.5" /><circle cx="12" cy="8" r="2.5" /><circle cx="18" cy="8" r="2.5" /><path d="M2 19c0-2.5 1.5-4 4-4s4 1.5 4 4" /><path d="M8 19c0-2.5 1.5-4 4-4s4 1.5 4 4" /><path d="M14 19c0-2.5 1.5-4 4-4s4 1.5 4 4" />
+    </svg>
+  ),
+  correlation: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M3 20L21 4" /><circle cx="6" cy="16" r="1.5" fill="currentColor" /><circle cx="10" cy="14" r="1.5" fill="currentColor" /><circle cx="14" cy="10" r="1.5" fill="currentColor" /><circle cx="18" cy="7" r="1.5" fill="currentColor" />
+    </svg>
+  ),
+  single: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="8" r="4" /><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+    </svg>
+  ),
+  // Distribution
+  normal: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M2 20 C4 20, 6 18, 8 14 C10 8, 11 4, 12 4 C13 4, 14 8, 16 14 C18 18, 20 20, 22 20" />
+    </svg>
+  ),
+  skewed: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M2 20 C3 20, 4 19, 5 16 C6 11, 7 5, 8 4 C9 5, 11 10, 14 15 C17 18, 19 20, 22 20" />
+    </svg>
+  ),
+  // Adjust
+  adjust_no: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  ),
+  adjust_yes: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  ),
+  // Sample size
+  small_sample: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+    </svg>
+  ),
+  large_sample: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  // Descriptive types
+  desc_continuous: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M4 20h16" /><path d="M4 20V10" /><rect x="7" y="6" width="3" height="14" rx="0.5" opacity="0.3" fill="currentColor" /><rect x="11" y="3" width="3" height="17" rx="0.5" opacity="0.5" fill="currentColor" /><rect x="15" y="8" width="3" height="12" rx="0.5" opacity="0.3" fill="currentColor" />
+    </svg>
+  ),
+  desc_categorical: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="9" /><path d="M12 3v9l6.5 4" /><path d="M12 12L6 17" />
+    </svg>
+  ),
+  table: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" /><path d="M9 3v18" />
+    </svg>
+  ),
+  not_sure: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="9" /><path d="M9 9c0-1.5 1.3-3 3-3s3 1.5 3 3c0 2-3 2.5-3 4.5" /><circle cx="12" cy="18" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+  // Home screen
+  describe: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <rect x="4" y="14" width="4" height="6" rx="1" /><rect x="10" y="8" width="4" height="12" rx="1" /><rect x="16" y="4" width="4" height="16" rx="1" />
+    </svg>
+  ),
+  test: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <circle cx="12" cy="4" r="2" /><path d="M12 6v4" /><path d="M12 10l-6 5" /><path d="M12 10l6 5" /><circle cx="6" cy="17" r="2.5" /><circle cx="18" cy="17" r="2.5" />
+    </svg>
+  ),
+};
+
 function Breadcrumbs({ answers, steps }) {
   const answered = steps.filter((s) => answers[s.id] !== undefined);
   if (answered.length === 0) return null;
@@ -277,7 +393,9 @@ function OptionCard({ option, selected, onClick }) {
       }`}
     >
       <div className="flex items-start gap-3">
-        <span className="text-2xl mt-0.5">{option.icon}</span>
+        <div className={`flex-shrink-0 mt-0.5 ${isSelected ? "text-indigo-600" : "text-gray-400"}`}>
+          {typeof option.icon === "string" ? ICONS[option.icon] || <span className="text-2xl">{option.icon}</span> : option.icon}
+        </div>
         <div>
           <div className={`font-semibold text-base ${isSelected ? "text-indigo-700" : "text-gray-800"}`}>
             {option.label}
@@ -330,12 +448,12 @@ function TestResult({ testKey, useTraditional }) {
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-gray-200 overflow-x-auto">
+      <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
         {tabs.map((tb) => (
           <button
             key={tb.id}
             onClick={() => setTab(tb.id)}
-            className={`flex-1 py-2.5 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap px-2 ${
+            className={`flex-1 min-w-0 py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap px-3 ${
               tab === tb.id
                 ? "text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50"
                 : "text-gray-500 hover:text-gray-700"
@@ -461,12 +579,12 @@ function DescriptiveResult({ descKey, useTraditional }) {
       <div className="bg-teal-600 px-5 py-3">
         <h3 className="text-white font-bold text-lg">{d.name}</h3>
       </div>
-      <div className="flex border-b border-gray-200 overflow-x-auto">
+      <div className="flex border-b border-gray-200 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: "none", msOverflowStyle: "none", WebkitOverflowScrolling: "touch" }}>
         {tabs.map((tb) => (
           <button
             key={tb.id}
             onClick={() => setTab(tb.id)}
-            className={`flex-1 py-2.5 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap px-2 ${
+            className={`flex-1 min-w-0 py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap px-3 ${
               tab === tb.id
                 ? "text-teal-600 border-b-2 border-teal-600 bg-teal-50"
                 : "text-gray-500 hover:text-gray-700"
@@ -603,7 +721,7 @@ export default function ChooseMyStat() {
               className="w-full text-left bg-white rounded-2xl shadow-lg border-2 border-gray-100 hover:border-teal-400 hover:shadow-xl transition-all p-6 group"
             >
               <div className="flex items-start gap-4">
-                <div className="text-3xl">📊</div>
+                <div className="text-teal-500 group-hover:text-teal-700 transition-colors">{ICONS.describe}</div>
                 <div>
                   <div className="text-lg font-bold text-gray-800 group-hover:text-teal-700">
                     Describe My Variables
@@ -620,7 +738,7 @@ export default function ChooseMyStat() {
               className="w-full text-left bg-white rounded-2xl shadow-lg border-2 border-gray-100 hover:border-indigo-400 hover:shadow-xl transition-all p-6 group"
             >
               <div className="flex items-start gap-4">
-                <div className="text-3xl">🧪</div>
+                <div className="text-indigo-400 group-hover:text-indigo-700 transition-colors">{ICONS.test}</div>
                 <div>
                   <div className="text-lg font-bold text-gray-800 group-hover:text-indigo-700">
                     Choose a Statistical Test
@@ -806,16 +924,54 @@ export default function ChooseMyStat() {
             )}
 
             {/* Actions */}
-            <div className="flex justify-between mt-5 px-1">
+            <div className="flex justify-between items-center mt-5 px-1">
               <button onClick={handleBack} className="text-sm text-indigo-600 font-medium hover:text-indigo-800">
                 ← Back
               </button>
-              <button
-                onClick={handleReset}
-                className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
-              >
-                Start Over
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    const testData = mode === "descriptive"
+                      ? results.map((k) => DESCRIPTIVES[k])
+                      : results.map((k) => TESTS[k]);
+                    const lines = [
+                      "ChooseMyStat — Recommendation",
+                      "=" .repeat(40),
+                      "",
+                      "Your inputs: " + Object.values(answers).join(" → "),
+                      "",
+                      ...testData.flatMap((t) => [
+                        `TEST: ${t.name}`,
+                        "-".repeat(30),
+                        "SAP Template:",
+                        useTraditional ? (t.sapTraditional || t.sap) : t.sap,
+                        "",
+                        ...(t.r ? ["R Code:", t.r, ""] : []),
+                        ...(t.jasp ? ["JASP Path:", t.jasp, ""] : []),
+                        "",
+                      ]),
+                      "Generated by ChooseMyStat · Clinical Epidemiology Unit, AIIMS Bhopal",
+                    ];
+                    const blob = new Blob([lines.join("\n")], { type: "text/plain" });
+                    const a = document.createElement("a");
+                    a.href = URL.createObjectURL(blob);
+                    a.download = `ChooseMyStat_${results[0] || "recommendation"}.txt`;
+                    a.click();
+                  }}
+                  className="flex items-center gap-1.5 text-sm text-gray-500 font-medium px-3 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Save
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="bg-indigo-600 text-white text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  Start Over
+                </button>
+              </div>
             </div>
           </div>
         )}
