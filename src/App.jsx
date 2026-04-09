@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { TESTS, STEPS, recommend } from "./statTestsData";
 
 const DESCRIPTIVES = {
@@ -168,6 +168,24 @@ const DESCRIPTIVE_STEPS = [
   },
 ];
 
+function explainReasoning(answers) {
+  const { outcome, comparison, distribution, adjust, sampleSize } = answers;
+  const parts = [];
+
+  const outcomeLabels = { continuous: "continuous", binary: "binary", categorical: "ordered categorical (3+ levels)", time_to_event: "time-to-event (survival)" };
+  const compLabels = { two_independent: "two independent groups", two_paired: "paired/before-after measurements", three_plus: "three or more independent groups", correlation: "association between two variables", single: "a single group vs. a known reference" };
+
+  if (outcome) parts.push(`Your outcome is **${outcomeLabels[outcome] || outcome}**`);
+  if (comparison) parts.push(`with **${compLabels[comparison] || comparison}**`);
+  if (distribution === "normal") parts.push("and the data is **normally distributed**");
+  if (distribution === "skewed") parts.push("and the data is **not normally distributed**");
+  if (sampleSize === "small") parts.push("with a **small sample size** (expected cell count < 5)");
+  if (adjust === "yes") parts.push("You also need to **adjust for confounders**, so a regression model is added.");
+  else if (adjust === "no") parts.push("No confounder adjustment is needed.");
+
+  return parts.join(", ").replace(/,([^,]*)$/, ".$1") || "";
+}
+
 function recommendDescriptive(answers) {
   const { desc_goal, desc_distribution } = answers;
   if (desc_goal === "table_one") return ["table_one"];
@@ -182,6 +200,70 @@ function recommendDescriptive(answers) {
 }
 
 // ─── UI Components ───
+
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className={`absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
+        copied
+          ? "bg-green-100 text-green-700 border border-green-300"
+          : "bg-white/80 text-gray-500 border border-gray-200 hover:bg-white hover:text-gray-700 hover:border-gray-300"
+      }`}
+      title="Copy to clipboard"
+    >
+      {copied ? "✓ Copied" : "Copy"}
+    </button>
+  );
+}
+
+function Breadcrumbs({ answers, steps }) {
+  const answered = steps.filter((s) => answers[s.id] !== undefined);
+  if (answered.length === 0) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1 mb-3 px-1">
+      {answered.map((step, i) => {
+        const chosen = step.options.find((o) => o.value === answers[step.id]);
+        return (
+          <span key={step.id} className="flex items-center gap-1">
+            {i > 0 && <span className="text-gray-300 text-xs">›</span>}
+            <span className="bg-indigo-100 text-indigo-700 text-xs font-medium px-2 py-0.5 rounded-full">
+              {chosen?.label || answers[step.id]}
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function SlideTransition({ children, stepKey, direction }) {
+  const [animClass, setAnimClass] = useState("opacity-100 translate-x-0");
+  const prevKey = useRef(stepKey);
+
+  useEffect(() => {
+    if (prevKey.current !== stepKey) {
+      const enter = direction === "forward" ? "translate-x-8" : "-translate-x-8";
+      setAnimClass(`opacity-0 ${enter}`);
+      const t = setTimeout(() => setAnimClass("opacity-100 translate-x-0"), 30);
+      prevKey.current = stepKey;
+      return () => clearTimeout(t);
+    }
+  }, [stepKey, direction]);
+
+  return (
+    <div className={`transform transition-all duration-300 ease-out ${animClass}`}>
+      {children}
+    </div>
+  );
+}
 
 function OptionCard({ option, selected, onClick }) {
   const isSelected = selected === option.value;
@@ -274,8 +356,11 @@ function TestResult({ testKey, useTraditional }) {
                 <span className="ml-2 text-amber-600 normal-case font-normal">(traditional style)</span>
               )}
             </p>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed font-serif italic whitespace-pre-line">
-              {sapText}
+            <div className="relative">
+              <CopyButton text={sapText} />
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 pr-20 text-sm text-gray-700 leading-relaxed font-serif italic whitespace-pre-line">
+                {sapText}
+              </div>
             </div>
             <p className="text-xs text-gray-400 mt-3">
               Replace bracketed text [like this] with your specific variables.
@@ -291,8 +376,11 @@ function TestResult({ testKey, useTraditional }) {
                 <span className="ml-2 text-amber-600 normal-case font-normal">(traditional style)</span>
               )}
             </p>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed font-serif whitespace-pre-line">
-              {exampleText}
+            <div className="relative">
+              <CopyButton text={exampleText} />
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4 pr-20 text-sm text-gray-700 leading-relaxed font-serif whitespace-pre-line">
+                {exampleText}
+              </div>
             </div>
             <div className="mt-3 bg-gray-50 rounded-lg p-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">What to report</p>
@@ -319,8 +407,11 @@ function TestResult({ testKey, useTraditional }) {
             <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">
               JASP Menu Path & Settings
             </p>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-mono">
-              {t.jasp}
+            <div className="relative">
+              <CopyButton text={t.jasp} />
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 pr-20 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-mono">
+                {t.jasp}
+              </div>
             </div>
             <p className="text-xs text-gray-400 mt-3">
               JASP is free, open-source: <span className="text-indigo-500">jasp-stats.org</span>
@@ -333,8 +424,11 @@ function TestResult({ testKey, useTraditional }) {
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">
               R Code (tidyverse ecosystem)
             </p>
-            <div className="bg-gray-900 rounded-lg p-4 text-sm text-green-300 leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto">
-              {t.r}
+            <div className="relative">
+              <CopyButton text={t.r} />
+              <div className="bg-gray-900 rounded-lg p-4 pr-20 text-sm text-green-300 leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto">
+                {t.r}
+              </div>
             </div>
             <p className="text-xs text-gray-400 mt-3">
               Adapt variable names (outcome, group, df) to your dataset. Key packages: gtsummary, sjPlot, finalfit, effectsize, lme4.
@@ -388,8 +482,11 @@ function DescriptiveResult({ descKey, useTraditional }) {
             <p className="text-xs font-semibold text-teal-600 uppercase tracking-wide mb-2">
               Copy and adapt for your protocol
             </p>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed font-serif italic whitespace-pre-line">
-              {sapText}
+            <div className="relative">
+              <CopyButton text={sapText} />
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 pr-20 text-sm text-gray-700 leading-relaxed font-serif italic whitespace-pre-line">
+                {sapText}
+              </div>
             </div>
           </div>
         )}
@@ -408,16 +505,22 @@ function DescriptiveResult({ descKey, useTraditional }) {
         {tab === "jasp" && (
           <div>
             <p className="text-xs font-semibold text-purple-600 uppercase tracking-wide mb-2">JASP Menu Path</p>
-            <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-mono">
-              {d.jasp}
+            <div className="relative">
+              <CopyButton text={d.jasp} />
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 pr-20 text-sm text-gray-700 leading-relaxed whitespace-pre-line font-mono">
+                {d.jasp}
+              </div>
             </div>
           </div>
         )}
         {tab === "r" && (
           <div>
             <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-2">R Code (tidyverse)</p>
-            <div className="bg-gray-900 rounded-lg p-4 text-sm text-green-300 leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto">
-              {d.r}
+            <div className="relative">
+              <CopyButton text={d.r} />
+              <div className="bg-gray-900 rounded-lg p-4 pr-20 text-sm text-green-300 leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto">
+                {d.r}
+              </div>
             </div>
           </div>
         )}
@@ -436,6 +539,7 @@ export default function ChooseMyStat() {
   const [showResults, setShowResults] = useState(false);
   const [useTraditional, setUseTraditional] = useState(false);
   const [showContributors, setShowContributors] = useState(false);
+  const [slideDirection, setSlideDirection] = useState("forward");
 
   const activeSteps = mode === "descriptive" ? DESCRIPTIVE_STEPS : STEPS;
   const visibleSteps = activeSteps.filter((s) => !s.show || s.show(answers));
@@ -445,6 +549,7 @@ export default function ChooseMyStat() {
     (value) => {
       const updated = { ...answers, [currentStep.id]: value };
       setAnswers(updated);
+      setSlideDirection("forward");
 
       setTimeout(() => {
         const nextVisible = activeSteps.filter((s) => !s.show || s.show(updated));
@@ -460,6 +565,7 @@ export default function ChooseMyStat() {
   );
 
   const handleBack = () => {
+    setSlideDirection("back");
     if (showResults) { setShowResults(false); return; }
     if (stepIndex > 0) { setStepIndex(stepIndex - 1); return; }
     // At first step → go back to home
@@ -590,23 +696,26 @@ export default function ChooseMyStat() {
 
         {!showResults ? (
           <div>
+            <Breadcrumbs answers={answers} steps={activeSteps.filter((s) => !s.show || s.show(answers))} />
             <ProgressDots total={visibleSteps.length} current={stepIndex} />
 
             {/* Question card */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-4">
-              <h2 className="text-lg font-bold text-gray-800 mb-1">{currentStep.title}</h2>
-              <p className="text-sm text-gray-500 mb-5">{currentStep.subtitle}</p>
-              <div className="space-y-3">
-                {currentStep.options.map((opt) => (
-                  <OptionCard
-                    key={opt.value}
-                    option={opt}
-                    selected={answers[currentStep.id]}
-                    onClick={handleSelect}
-                  />
-                ))}
+            <SlideTransition stepKey={currentStep.id} direction={slideDirection}>
+              <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-4">
+                <h2 className="text-lg font-bold text-gray-800 mb-1">{currentStep.title}</h2>
+                <p className="text-sm text-gray-500 mb-5">{currentStep.subtitle}</p>
+                <div className="space-y-3">
+                  {currentStep.options.map((opt) => (
+                    <OptionCard
+                      key={opt.value}
+                      option={opt}
+                      selected={answers[currentStep.id]}
+                      onClick={handleSelect}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            </SlideTransition>
 
             {/* Navigation */}
             <div className="flex justify-between items-center px-1">
@@ -636,6 +745,16 @@ export default function ChooseMyStat() {
                   </span>
                 ))}
               </div>
+
+              {/* Why this test? */}
+              {mode === "inferential" && (
+                <div className="bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-3 mb-3">
+                  <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-1">Why this test?</p>
+                  <p className="text-sm text-indigo-900 leading-relaxed"
+                     dangerouslySetInnerHTML={{ __html: explainReasoning(answers).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
+                  />
+                </div>
+              )}
 
               {mode === "inferential" && results.length > 1 && (
                 <p className="text-xs text-gray-400 italic mb-3">
