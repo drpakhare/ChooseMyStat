@@ -536,9 +536,7 @@ export default function ChooseMyStat() {
   const [showPlan, setShowPlan] = useState(false);
   const [planTitle, setPlanTitle] = useState("");
   const [planDesign, setPlanDesign] = useState("");
-  const [dark, setDark] = useState(() => {
-    try { return window.matchMedia("(prefers-color-scheme: dark)").matches; } catch { return false; }
-  });
+  const [dark, setDark] = useState(false);
 
   // ─── Apply dark mode CSS variable for result cards ───
   useEffect(() => {
@@ -972,7 +970,7 @@ export default function ChooseMyStat() {
               <button
                 onClick={() => {
                   navigator.clipboard.writeText(window.location.href);
-                  alert("Link copied! Share it with your guide or batchmates.");
+                  alert("Link copied! Share it with your collaborators.");
                 }}
                 className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-lg mb-3 transition-colors ${dark ? "text-indigo-300 bg-indigo-950 hover:bg-indigo-900 border border-indigo-800" : "text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-100"}`}
               >
