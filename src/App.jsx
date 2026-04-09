@@ -469,7 +469,7 @@ function TestResult({ testKey, useTraditional }) {
         {tab === "sap" && (
           <div>
             <p className="text-xs font-semibold text-indigo-600 uppercase tracking-wide mb-2">
-              Copy and adapt for your protocol
+              Statistical Analysis Plan (SAP) — copy and adapt for your protocol
               {useTraditional && (
                 <span className="ml-2 text-amber-600 normal-case font-normal">(traditional style)</span>
               )}
@@ -647,14 +647,15 @@ function DescriptiveResult({ descKey, useTraditional }) {
   );
 }
 
-// ─── Hex Logo (R-package style) ───
+// ─── Hex Logo (R-package style — Flowchart Diamond) ───
 function HexLogo({ dark }) {
   return (
     <svg viewBox="0 0 200 230" className="w-28 h-32 mx-auto mb-4 drop-shadow-lg">
       <defs>
         <linearGradient id="hexGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stopColor={dark ? "#6366f1" : "#4f46e5"} />
-          <stop offset="100%" stopColor={dark ? "#818cf8" : "#6366f1"} />
+          <stop offset="0%" stopColor={dark ? "#6366f1" : "#4338ca"} />
+          <stop offset="50%" stopColor={dark ? "#818cf8" : "#4f46e5"} />
+          <stop offset="100%" stopColor={dark ? "#a78bfa" : "#7c3aed"} />
         </linearGradient>
       </defs>
       {/* Hex shape */}
@@ -662,22 +663,32 @@ function HexLogo({ dark }) {
         points="100,8 190,58 190,172 100,222 10,172 10,58"
         fill="url(#hexGrad)"
         stroke={dark ? "#a5b4fc" : "#312e81"}
-        strokeWidth="5"
+        strokeWidth="4"
       />
-      {/* Decision tree icon */}
-      <circle cx="100" cy="60" r="10" fill="none" stroke="white" strokeWidth="3" />
-      <line x1="100" y1="70" x2="100" y2="95" stroke="white" strokeWidth="3" />
-      <line x1="100" y1="95" x2="65" y2="125" stroke="white" strokeWidth="3" />
-      <line x1="100" y1="95" x2="135" y2="125" stroke="white" strokeWidth="3" />
-      <circle cx="65" cy="130" r="8" fill="none" stroke="white" strokeWidth="3" />
-      <circle cx="135" cy="130" r="8" fill="none" stroke="white" strokeWidth="3" />
+      {/* Input pill */}
+      <rect x="75" y="38" width="50" height="20" rx="10" fill="none" stroke="white" strokeWidth="2.5" />
+      {/* Line to diamond */}
+      <line x1="100" y1="58" x2="100" y2="68" stroke="white" strokeWidth="2" />
+      {/* Decision diamond */}
+      <polygon points="100,68 130,90 100,112 70,90" fill="none" stroke="white" strokeWidth="2.5" />
+      <text x="100" y="94" textAnchor="middle" fill="white" fontSize="11" fontFamily="system-ui, sans-serif" fontWeight="700">?</text>
+      {/* Yes path (right) */}
+      <line x1="130" y1="90" x2="150" y2="90" stroke="white" strokeWidth="2" />
+      <rect x="143" y="80" width="30" height="18" rx="4" fill="white" opacity="0.25" />
+      <text x="158" y="93" textAnchor="middle" fill="white" fontSize="9" fontFamily="system-ui, sans-serif" fontWeight="700">Yes</text>
+      {/* No path (left) */}
+      <line x1="70" y1="90" x2="50" y2="90" stroke="white" strokeWidth="2" />
+      <rect x="27" y="80" width="30" height="18" rx="4" fill="white" opacity="0.25" />
+      <text x="42" y="93" textAnchor="middle" fill="white" fontSize="9" fontFamily="system-ui, sans-serif" fontWeight="700">No</text>
+      {/* Down to result */}
+      <line x1="100" y1="112" x2="100" y2="122" stroke="white" strokeWidth="2" />
+      {/* Result box with checkmark */}
+      <rect x="78" y="122" width="44" height="22" rx="4" fill="white" opacity="0.25" stroke="white" strokeWidth="2" />
+      <path d="M90 133 l4 4 l10-10" stroke="white" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
       {/* Text */}
-      <text x="100" y="172" textAnchor="middle" fill="white" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="24" letterSpacing="0.5">
-        Choose
-      </text>
-      <text x="100" y="198" textAnchor="middle" fill="white" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="24" letterSpacing="0.5">
-        MyStat
-      </text>
+      <text x="100" y="168" textAnchor="middle" fill="white" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="20" letterSpacing="1">Choose</text>
+      <text x="100" y="191" textAnchor="middle" fill="white" fontFamily="system-ui, sans-serif" fontWeight="800" fontSize="20" letterSpacing="1">MyStat</text>
+      <text x="100" y="210" textAnchor="middle" fill="rgba(255,255,255,0.4)" fontFamily="system-ui, sans-serif" fontSize="10">v1.0</text>
     </svg>
   );
 }
@@ -815,7 +826,7 @@ export default function ChooseMyStat() {
           <div className="text-center mb-6">
             <HexLogo dark={dark} />
             <p className={`text-sm ${textSecondary} mt-1`}>
-              Your guide to descriptive summaries, statistical tests, and SAP templates
+              Statistical test advisor for clinical researchers — with Statistical Analysis Plan (SAP) templates, results reporting, and ready-to-use code
             </p>
           </div>
 
@@ -831,7 +842,7 @@ export default function ChooseMyStat() {
                     Describe My Variables
                   </div>
                   <div className={`text-sm ${textSecondary} mt-1`}>
-                    Get the right summary measures, SAP text, and code for your descriptive analysis and Table 1
+                    Summary measures, SAP text, and code for descriptive analysis and Table 1
                   </div>
                 </div>
               </div>
@@ -848,7 +859,7 @@ export default function ChooseMyStat() {
                     Choose a Statistical Test
                   </div>
                   <div className={`text-sm ${textSecondary} mt-1`}>
-                    Answer a few questions about your data and get the recommended test with SAP templates, JASP steps, and R code
+                    Answer a few questions about your study design and get the right test with SAP template, results text, JASP steps, and R code
                   </div>
                 </div>
               </div>
