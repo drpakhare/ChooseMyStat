@@ -24,45 +24,6 @@ function CopyButton({ text }) {
   );
 }
 
-function Tooltip({ term, children }) {
-  const [show, setShow] = useState(false);
-  const ref = useRef(null);
-
-  useEffect(() => {
-    if (!show) return;
-    const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) setShow(false);
-    };
-    document.addEventListener("mousedown", handler);
-    document.addEventListener("touchstart", handler);
-    return () => {
-      document.removeEventListener("mousedown", handler);
-      document.removeEventListener("touchstart", handler);
-    };
-  }, [show]);
-
-  const def = GLOSSARY[term.toLowerCase()];
-  if (!def) return children || term;
-
-  return (
-    <span ref={ref} className="relative inline">
-      <button
-        onClick={(e) => { e.stopPropagation(); setShow(!show); }}
-        className="border-b border-dotted border-gray-400 text-inherit cursor-help hover:border-indigo-500 transition-colors"
-      >
-        {children || term}
-      </button>
-      {show && (
-        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[90vw] bg-gray-900 text-white text-xs leading-relaxed rounded-lg px-3 py-2.5 shadow-xl">
-          <span className="font-semibold text-indigo-300 block mb-1">{term}</span>
-          {def}
-          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
-        </span>
-      )}
-    </span>
-  );
-}
-
 // ─── SVG Icon set (24×24, consistent stroke style) ───
 const ICONS = {
   // Outcome types
@@ -745,6 +706,29 @@ export default function ChooseMyStat() {
             </p>
           </div>
 
+          {/* ─── How to Use ─── */}
+          <div className={`rounded-2xl border shadow-sm overflow-hidden mb-6 ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+            <div className="px-5 pt-4 pb-1">
+              <p className={`text-xs font-bold uppercase tracking-wide ${dark ? "text-gray-400" : "text-gray-500"}`}>How to use</p>
+            </div>
+            <div className="px-5 pb-4 pt-2">
+              {[
+                { num: "1", icon: "📋", title: "Pick a mode", desc: "Choose whether you need descriptive summaries (Table 1) or an inferential statistical test." },
+                { num: "2", icon: "❓", title: "Answer a few questions", desc: "Tell us your outcome type, number of groups, pairing, and whether you need to adjust for confounders." },
+                { num: "3", icon: "✅", title: "Get your recommendation", desc: "Receive the right test or summary — with a SAP template paragraph, results example, JASP steps, and R code." },
+                { num: "4", icon: "📥", title: "Copy or download", desc: "Paste the SAP text into your protocol, use the R code in your script, or download everything as a text file." },
+              ].map((s, i) => (
+                <div key={i} className="flex items-start gap-3 py-2.5">
+                  <span className={`text-base w-7 h-7 flex items-center justify-center rounded-full flex-shrink-0 font-bold ${dark ? "bg-indigo-900/50 text-indigo-300" : "bg-indigo-100 text-indigo-600"}`} style={{ fontSize: "13px" }}>{s.num}</span>
+                  <div className="min-w-0">
+                    <p className={`text-sm font-semibold ${dark ? "text-gray-200" : "text-gray-800"}`}>{s.title}</p>
+                    <p className={`text-xs leading-relaxed mt-0.5 ${dark ? "text-gray-500" : "text-gray-500"}`}>{s.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
           <div className="space-y-4">
             <button
               onClick={() => setMode("descriptive")}
@@ -779,6 +763,31 @@ export default function ChooseMyStat() {
                 </div>
               </div>
             </button>
+          </div>
+
+          {/* ─── Core Concepts ─── */}
+          <div className={`mt-6 rounded-2xl border shadow-sm overflow-hidden ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+            <div className="px-5 pt-4 pb-1">
+              <p className={`text-xs font-bold uppercase tracking-wide ${dark ? "text-gray-400" : "text-gray-500"}`}>Core concepts</p>
+              <p className={`text-xs mt-1 ${dark ? "text-gray-600" : "text-gray-400"}`}>Key terms you'll encounter while using this tool</p>
+            </div>
+            <div className="px-5 pb-4 pt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-3">
+              {[
+                { term: "Outcome (Dependent Variable)", def: "The variable you're measuring or trying to explain — e.g., blood pressure, mortality, recovery time." },
+                { term: "Continuous vs Categorical", def: "Continuous data can take any numeric value (weight, BP). Categorical data falls into groups (gender, disease stage, yes/no)." },
+                { term: "Paired vs Independent", def: "Paired: same subjects measured twice (before/after). Independent: different subjects in each group." },
+                { term: "Parametric vs Non-parametric", def: "Parametric tests assume normally distributed data (t-test, ANOVA). Non-parametric tests don't (Mann-Whitney, Kruskal-Wallis)." },
+                { term: "Confounders / Covariates", def: "Variables that could distort the relationship you're studying. Adjusting for them requires regression or stratified analysis." },
+                { term: "Normality", def: "Whether your data follows a bell-shaped distribution. Check with Shapiro-Wilk test or Q-Q plots — matters for choosing parametric vs non-parametric." },
+                { term: "p-value", def: "Probability of seeing your result (or more extreme) if the null hypothesis were true. Smaller p = stronger evidence against the null — but not a measure of effect size." },
+                { term: "Effect Size", def: "How large the difference or association is (e.g., Cohen's d, odds ratio, correlation r). Always report alongside p-values." },
+              ].map((c, i) => (
+                <div key={i} className="py-1.5">
+                  <p className={`text-sm font-semibold ${dark ? "text-indigo-300" : "text-indigo-700"}`}>{c.term}</p>
+                  <p className={`text-xs leading-relaxed mt-0.5 ${dark ? "text-gray-400" : "text-gray-600"}`}>{c.def}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* ─── Plan Builder Panel ─── */}
