@@ -422,6 +422,49 @@ cat(sprintf("Diff: %.1f%% (95%% CI: %.1f%% to %.1f%%)",
   diff*100, (diff - 1.96*se)*100, (diff + 1.96*se)*100))`
   },
 
+  stuart_maxwell: {
+    name: "Stuart-Maxwell Test (Marginal Homogeneity)",
+    when: "Comparing paired proportions across 3+ ordered categories — e.g., disease severity before/after treatment in the same subjects.",
+    assumptions: "Paired ordinal data (same subjects measured at two time points), 3+ ordered categories.",
+
+    sap: `The change in distribution of [outcome] (3+ ordered categories) before and after [intervention] will be assessed using the Stuart-Maxwell test of marginal homogeneity. This extends McNemar's test to square tables larger than 2×2. The pattern of shifts across categories will be described using a transition matrix.`,
+    sapTraditional: `The change in distribution of [outcome] before and after [intervention] will be assessed using the Stuart-Maxwell test of marginal homogeneity. Results will be expressed as frequencies (%) at each time point. A two-sided p-value < 0.05 will be considered statistically significant.`,
+
+    example: `Disease severity shifted after treatment: Mild 20%→45%, Moderate 50%→35%, Severe 30%→20% (Stuart-Maxwell χ² = 12.4, df = 2, p = 0.002). The transition matrix shows 65% of Severe patients improved to Moderate or Mild — a clinically meaningful shift.`,
+    exampleTraditional: `The distribution of disease severity changed significantly after treatment (Stuart-Maxwell test, χ² = 12.4, df = 2, p = 0.002).`,
+
+    report: "Frequencies (%) per category at each time point, transition matrix, Stuart-Maxwell χ², df, p-value",
+
+    jasp: `JASP does not have a built-in Stuart-Maxwell / marginal homogeneity test.
+
+Use R (see R tab) or SPSS:
+SPSS: Analyze → Nonparametric Tests → Related Samples → select Marginal Homogeneity`,
+
+    r: `library(coin)
+
+# ── Data: paired ordinal categories (before/after) ──
+# df should have: subject_id, before (factor), after (factor)
+df$before <- factor(df$before,
+  levels = c("Mild", "Moderate", "Severe"), ordered = TRUE)
+df$after  <- factor(df$after,
+  levels = c("Mild", "Moderate", "Severe"), ordered = TRUE)
+
+# ── Stuart-Maxwell / Marginal Homogeneity test ──
+mh_test(before ~ after, data = df)
+
+# ── Transition matrix ──
+tab <- table(Before = df$before, After = df$after)
+print(tab)
+prop.table(tab, margin = 1) |> round(2)  # row %
+
+# ── Descriptive summary ──
+tibble(
+  time  = c(rep("Before", nrow(df)), rep("After", nrow(df))),
+  level = c(as.character(df$before), as.character(df$after))
+) |> count(time, level) |>
+  group_by(time) |> mutate(pct = round(n / sum(n) * 100, 1))`
+  },
+
   // ━━━ CORRELATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   correlation: {
@@ -822,7 +865,7 @@ export function recommend(answers) {
 
   if (outcome === "binary" || outcome === "categorical") {
     if (comparison === "two_paired") {
-      results.push("mcnemar");
+      results.push(outcome === "binary" ? "mcnemar" : "stuart_maxwell");
       if (adjust === "yes") results.push("gee");
     } else {
       if (sampleSize === "small") results.push("fisher");
@@ -874,8 +917,8 @@ export const STEPS = [
       { value: "two_independent", label: "2 Independent Groups", desc: "Treatment vs Control, Exposed vs Unexposed", icon: "👥" },
       { value: "two_paired", label: "2 Paired / Before-After", desc: "Same subjects measured twice", icon: "🔄" },
       { value: "three_plus", label: "3+ Independent Groups", desc: "Multiple treatment arms, severity grades", icon: "👥👥" },
-      { value: "correlation", label: "Association (2 variables)", desc: "Correlation between two measurements", icon: "📈" },
-      { value: "single", label: "Single Group (vs reference)", desc: "Compare sample mean to a known value", icon: "1️⃣" },
+      { value: "correlation", label: "Association (2 variables)", desc: "Correlation between two measurements", icon: "📈", showWhen: (a) => a.outcome === "continuous" },
+      { value: "single", label: "Single Group (vs reference)", desc: "Compare sample mean to a known value", icon: "1️⃣", showWhen: (a) => a.outcome === "continuous" },
     ],
   },
   {
@@ -1113,3 +1156,28 @@ export function recommendDescriptive(answers) {
   }
   return [];
 }
+
+// ─── Glossary of Key Terms ───
+
+export const GLOSSARY = {
+  "p-value": "The probability of observing results as extreme as the data, assuming the null hypothesis is true. It is NOT the probability that the null hypothesis is true. Smaller p-values indicate stronger evidence against the null.",
+  "confidence interval": "A range of values that is likely to contain the true population parameter. A 95% CI means if you repeated the study 100 times, approximately 95 of the intervals would contain the true value.",
+  "effect size": "A quantitative measure of the magnitude of a phenomenon. Examples: Cohen\u2019s d (mean difference in SD units), Odds Ratio, Hazard Ratio, Correlation coefficient (r). Unlike p-values, effect sizes indicate practical importance.",
+  "null hypothesis": "The default assumption that there is no difference or no association between groups/variables. Statistical tests evaluate the evidence against this hypothesis.",
+  "confounder": "A variable that is associated with both the exposure and the outcome, potentially distorting the true relationship. Adjusted analysis (regression) controls for confounders.",
+  "normality": "The assumption that data follows a bell-shaped (Gaussian) distribution. Assessed using Shapiro-Wilk test, histograms, or Q-Q plots. Many parametric tests require this.",
+  "Type I error": "Rejecting the null hypothesis when it is actually true (a false positive). The conventional threshold (\u03b1 = 0.05) means accepting a 5% risk of this error.",
+  "Type II error": "Failing to reject the null hypothesis when it is actually false (a false negative). Related to statistical power (1 \u2212 \u03b2).",
+  "statistical power": "The probability of correctly detecting a true effect (rejecting a false null hypothesis). Depends on sample size, effect size, and significance level. Typically aimed at \u2265 80%.",
+  "degrees of freedom": "The number of independent values that can vary in a statistical calculation. Affects the shape of test distributions (t, \u03c7\u00b2, F). Generally related to sample size minus the number of estimated parameters.",
+  "odds ratio": "The ratio of odds of an event in the exposed group to the odds in the unexposed group. OR = 1 means no association; OR > 1 means increased odds; OR < 1 means decreased odds.",
+  "hazard ratio": "In survival analysis, the ratio of hazard rates between groups. HR = 1 means equal risk; HR < 1 means lower risk in the treatment group; HR > 1 means higher risk.",
+  "regression coefficient": "The estimated change in the outcome for a one-unit increase in the predictor, holding other variables constant. In linear regression, it is the slope (B); in logistic regression, the log-odds.",
+  "multicollinearity": "When two or more predictors in a regression model are highly correlated with each other. Assessed using VIF (Variance Inflation Factor). VIF > 5\u201310 suggests a problem.",
+  "homoscedasticity": "The assumption that the variance of residuals is constant across all levels of the predictor(s). Violated if a residual plot shows a funnel shape. Required for linear regression.",
+  "non-parametric test": "A test that does not assume a specific distribution (e.g., normality). Uses ranks instead of raw values. Examples: Mann-Whitney, Wilcoxon, Kruskal-Wallis. Less powerful than parametric tests when normality holds, but more robust when it does not.",
+  "Bonferroni correction": "A method to control Type I error when performing multiple comparisons. Divides the significance level (\u03b1) by the number of comparisons. Conservative but simple.",
+  "AUC": "Area Under the ROC Curve. Measures how well a model discriminates between positive and negative cases. AUC = 0.5 means no discrimination (coin flip); AUC = 1.0 means perfect discrimination. Generally: 0.7\u20130.8 acceptable, 0.8\u20130.9 good, >0.9 excellent.",
+  "IQR": "Interquartile Range \u2014 the range between the 25th percentile (Q1) and 75th percentile (Q3). Contains the middle 50% of the data. Used to summarise skewed distributions alongside the median.",
+  "MCID": "Minimum Clinically Important Difference \u2014 the smallest change in an outcome that patients or clinicians would consider meaningful. Used to interpret whether a statistically significant effect is also clinically relevant.",
+};

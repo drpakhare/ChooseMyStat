@@ -1,7 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive } from "./statTestsData";
-
-// ─── UI Components ───
+import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive, GLOSSARY } from "./statTestsData";
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -23,6 +21,45 @@ function CopyButton({ text }) {
     >
       {copied ? "✓ Copied" : "Copy"}
     </button>
+  );
+}
+
+function Tooltip({ term, children }) {
+  const [show, setShow] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!show) return;
+    const handler = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) setShow(false);
+    };
+    document.addEventListener("mousedown", handler);
+    document.addEventListener("touchstart", handler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("touchstart", handler);
+    };
+  }, [show]);
+
+  const def = GLOSSARY[term.toLowerCase()];
+  if (!def) return children || term;
+
+  return (
+    <span ref={ref} className="relative inline">
+      <button
+        onClick={(e) => { e.stopPropagation(); setShow(!show); }}
+        className="border-b border-dotted border-gray-400 text-inherit cursor-help hover:border-indigo-500 transition-colors"
+      >
+        {children || term}
+      </button>
+      {show && (
+        <span className="absolute z-50 bottom-full left-1/2 -translate-x-1/2 mb-2 w-72 max-w-[90vw] bg-gray-900 text-white text-xs leading-relaxed rounded-lg px-3 py-2.5 shadow-xl">
+          <span className="font-semibold text-indigo-300 block mb-1">{term}</span>
+          {def}
+          <span className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+        </span>
+      )}
+    </span>
   );
 }
 
@@ -234,7 +271,6 @@ function TestResult({ testKey, useTraditional }) {
   const tabs = [
     { id: "sap", label: "SAP Template" },
     { id: "example", label: "Results Example" },
-    { id: "about", label: "About" },
     { id: "jasp", label: "In JASP" },
     { id: "r", label: "In R" },
   ];
@@ -247,6 +283,12 @@ function TestResult({ testKey, useTraditional }) {
       {/* Header */}
       <div className="bg-indigo-600 px-5 py-3">
         <h3 className="text-white font-bold text-lg">{t.name}</h3>
+      </div>
+
+      {/* When to use & Assumptions - always visible */}
+      <div className="px-5 py-3 border-b border-gray-100" style={{ background: "var(--card-bg, white)" }}>
+        <p className="text-sm text-gray-700 leading-relaxed">{t.when}</p>
+        <p className="text-xs text-gray-500 mt-1.5"><span className="font-semibold">Assumptions:</span> {t.assumptions}</p>
       </div>
 
       {/* Tab bar */}
@@ -309,18 +351,6 @@ function TestResult({ testKey, useTraditional }) {
           </div>
         )}
 
-        {tab === "about" && (
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">When to use</p>
-              <p className="text-sm text-gray-700">{t.when}</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Assumptions</p>
-              <p className="text-sm text-gray-700">{t.assumptions}</p>
-            </div>
-          </div>
-        )}
 
         {tab === "jasp" && (
           <div>
@@ -536,6 +566,7 @@ export default function ChooseMyStat() {
   const [showPlan, setShowPlan] = useState(false);
   const [planTitle, setPlanTitle] = useState("");
   const [planDesign, setPlanDesign] = useState("");
+  const [showGlossary, setShowGlossary] = useState(false);
   const [dark, setDark] = useState(false);
 
   // ─── Apply dark mode CSS variable for result cards ───
@@ -839,6 +870,69 @@ export default function ChooseMyStat() {
             </div>
           )}
 
+          {/* ─── Glossary & References ─── */}
+          <div className={`mt-8 rounded-2xl border shadow-sm overflow-hidden ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
+            {/* Glossary */}
+            <button
+              onClick={() => setShowGlossary(!showGlossary)}
+              className={`w-full flex items-center justify-between px-5 py-4 ${dark ? "hover:bg-gray-800" : "hover:bg-gray-50"} transition-colors`}
+            >
+              <div className="flex items-center gap-3">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={`w-5 h-5 ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                  <path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /><line x1="8" y1="7" x2="16" y2="7" /><line x1="8" y1="11" x2="14" y2="11" />
+                </svg>
+                <span className={`text-sm font-bold ${dark ? "text-amber-300" : "text-amber-800"}`}>
+                  Glossary of Key Terms
+                </span>
+              </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-4 h-4 transition-transform ${showGlossary ? "rotate-180" : ""} ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {showGlossary && (
+              <div className={`px-5 pb-5 border-t ${dark ? "border-gray-700" : "border-gray-100"}`}>
+                <div className="mt-3 space-y-3">
+                  {Object.entries(GLOSSARY).sort(([a], [b]) => a.localeCompare(b)).map(([term, def]) => (
+                    <div key={term}>
+                      <p className={`text-sm font-semibold ${dark ? "text-indigo-300" : "text-indigo-700"}`}>{term}</p>
+                      <p className={`text-xs leading-relaxed mt-0.5 ${dark ? "text-gray-400" : "text-gray-600"}`}>{def}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Further Reading / References */}
+            <div className={`px-5 py-4 border-t ${dark ? "border-gray-700" : "border-gray-100"}`}>
+              <div className="flex items-center gap-3 mb-3">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className={`w-5 h-5 ${dark ? "text-blue-400" : "text-blue-600"}`}>
+                  <path d="M2 3h6a4 4 0 014 4v14a3 3 0 00-3-3H2z" /><path d="M22 3h-6a4 4 0 00-4 4v14a3 3 0 013-3h7z" />
+                </svg>
+                <span className={`text-sm font-bold ${dark ? "text-blue-300" : "text-blue-800"}`}>
+                  Further Reading
+                </span>
+              </div>
+              <div className="space-y-2.5">
+                {[
+                  { authors: "Wasserstein RL, Lazar NA", year: "2016", title: "The ASA Statement on p-Values: Context, Process, and Purpose", journal: "The American Statistician", note: "The foundational statement on moving beyond p < 0.05" },
+                  { authors: "Lang TA, Altman DG", year: "2015", title: "Basic Statistical Reporting for Articles Published in Biomedical Journals: The SAMPL Guidelines", journal: "Science Editors' Handbook", note: "How to report statistical results in medical papers" },
+                  { authors: "Altman DG", year: "1991", title: "Practical Statistics for Medical Research", journal: "Chapman & Hall/CRC", note: "Classic reference for choosing and applying statistical tests" },
+                  { authors: "Motulsky HJ", year: "2014", title: "Intuitive Biostatistics", journal: "Oxford University Press (4th ed)", note: "Accessible guide to choosing the right test — highly recommended for residents" },
+                  { authors: "Greenhalgh T", year: "2019", title: "How to Read a Paper: The Basics of Evidence-Based Medicine and Healthcare", journal: "Wiley (6th ed)", note: "Understanding statistics in the context of clinical research" },
+                  { authors: "Sullivan GM, Feinn R", year: "2012", title: "Using Effect Size — or Why the P Value Is Not Enough", journal: "J Grad Med Educ", note: "Why effect sizes matter more than p-values" },
+                  { authors: "Kim HY", year: "2017", title: "Statistical notes for clinical researchers: Chi-squared test and Fisher's exact test", journal: "Restor Dent Endod", note: "Part of an excellent series on choosing between specific tests" },
+                ].map((ref, i) => (
+                  <div key={i} className={`text-xs leading-relaxed ${dark ? "text-gray-400" : "text-gray-600"}`}>
+                    <span className={`font-medium ${dark ? "text-gray-300" : "text-gray-700"}`}>{ref.authors} ({ref.year}).</span>{" "}
+                    <span className="italic">{ref.title}.</span>{" "}
+                    <span>{ref.journal}.</span>
+                    <span className={`block mt-0.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>→ {ref.note}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* Contributors */}
           <div className="mt-10 text-center">
             <button
@@ -924,7 +1018,9 @@ export default function ChooseMyStat() {
                 <h2 className={`text-lg font-bold ${textPrimary} mb-1`}>{currentStep.title}</h2>
                 <p className={`text-sm ${textSecondary} mb-5`}>{currentStep.subtitle}</p>
                 <div className="space-y-3">
-                  {currentStep.options.map((opt) => (
+                  {currentStep.options
+                    .filter((opt) => !opt.showWhen || opt.showWhen(answers))
+                    .map((opt) => (
                     <OptionCard
                       key={opt.value}
                       option={opt}
