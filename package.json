@@ -2,7 +2,7 @@
   "name": "choosemystat",
   "private": true,
   "version": "1.0.0",
-  "description": "Interactive statistical test advisor for PG thesis research",
+  "description": "Interactive statistical test advisor for clinical researchers",
   "type": "module",
   "scripts": {
     "dev": "vite",

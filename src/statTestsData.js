@@ -422,6 +422,49 @@ cat(sprintf("Diff: %.1f%% (95%% CI: %.1f%% to %.1f%%)",
   diff*100, (diff - 1.96*se)*100, (diff + 1.96*se)*100))`
   },
 
+  stuart_maxwell: {
+    name: "Stuart-Maxwell Test (Marginal Homogeneity)",
+    when: "Comparing paired proportions across 3+ ordered categories — e.g., disease severity before/after treatment in the same subjects.",
+    assumptions: "Paired ordinal data (same subjects measured at two time points), 3+ ordered categories.",
+
+    sap: `The change in distribution of [outcome] (3+ ordered categories) before and after [intervention] will be assessed using the Stuart-Maxwell test of marginal homogeneity. This extends McNemar's test to square tables larger than 2×2. The pattern of shifts across categories will be described using a transition matrix.`,
+    sapTraditional: `The change in distribution of [outcome] before and after [intervention] will be assessed using the Stuart-Maxwell test of marginal homogeneity. Results will be expressed as frequencies (%) at each time point. A two-sided p-value < 0.05 will be considered statistically significant.`,
+
+    example: `Disease severity shifted after treatment: Mild 20%→45%, Moderate 50%→35%, Severe 30%→20% (Stuart-Maxwell χ² = 12.4, df = 2, p = 0.002). The transition matrix shows 65% of Severe patients improved to Moderate or Mild — a clinically meaningful shift.`,
+    exampleTraditional: `The distribution of disease severity changed significantly after treatment (Stuart-Maxwell test, χ² = 12.4, df = 2, p = 0.002).`,
+
+    report: "Frequencies (%) per category at each time point, transition matrix, Stuart-Maxwell χ², df, p-value",
+
+    jasp: `JASP does not have a built-in Stuart-Maxwell / marginal homogeneity test.
+
+Use R (see R tab) or SPSS:
+SPSS: Analyze → Nonparametric Tests → Related Samples → select Marginal Homogeneity`,
+
+    r: `library(coin)
+
+# ── Data: paired ordinal categories (before/after) ──
+# df should have: subject_id, before (factor), after (factor)
+df$before <- factor(df$before,
+  levels = c("Mild", "Moderate", "Severe"), ordered = TRUE)
+df$after  <- factor(df$after,
+  levels = c("Mild", "Moderate", "Severe"), ordered = TRUE)
+
+# ── Stuart-Maxwell / Marginal Homogeneity test ──
+mh_test(before ~ after, data = df)
+
+# ── Transition matrix ──
+tab <- table(Before = df$before, After = df$after)
+print(tab)
+prop.table(tab, margin = 1) |> round(2)  # row %
+
+# ── Descriptive summary ──
+tibble(
+  time  = c(rep("Before", nrow(df)), rep("After", nrow(df))),
+  level = c(as.character(df$before), as.character(df$after))
+) |> count(time, level) |>
+  group_by(time) |> mutate(pct = round(n / sum(n) * 100, 1))`
+  },
+
   // ━━━ CORRELATION ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   correlation: {
@@ -822,7 +865,7 @@ export function recommend(answers) {
 
   if (outcome === "binary" || outcome === "categorical") {
     if (comparison === "two_paired") {
-      results.push("mcnemar");
+      results.push(outcome === "binary" ? "mcnemar" : "stuart_maxwell");
       if (adjust === "yes") results.push("gee");
     } else {
       if (sampleSize === "small") results.push("fisher");
@@ -874,8 +917,8 @@ export const STEPS = [
       { value: "two_independent", label: "2 Independent Groups", desc: "Treatment vs Control, Exposed vs Unexposed", icon: "👥" },
       { value: "two_paired", label: "2 Paired / Before-After", desc: "Same subjects measured twice", icon: "🔄" },
       { value: "three_plus", label: "3+ Independent Groups", desc: "Multiple treatment arms, severity grades", icon: "👥👥" },
-      { value: "correlation", label: "Association (2 variables)", desc: "Correlation between two measurements", icon: "📈" },
-      { value: "single", label: "Single Group (vs reference)", desc: "Compare sample mean to a known value", icon: "1️⃣" },
+      { value: "correlation", label: "Association (2 variables)", desc: "Correlation between two measurements", icon: "📈", showWhen: (a) => a.outcome === "continuous" },
+      { value: "single", label: "Single Group (vs reference)", desc: "Compare sample mean to a known value", icon: "1️⃣", showWhen: (a) => a.outcome === "continuous" },
     ],
   },
   {
@@ -913,3 +956,228 @@ export const STEPS = [
     ],
   },
 ];
+
+// ━━━ DESCRIPTIVE STATISTICS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const DESCRIPTIVES = {
+  continuous_normal: {
+    name: "Continuous Variable (Normal)",
+    summary: "Mean ± SD",
+    visual: "Histogram with normal curve, Box plot",
+    sap: `Continuous variables that are normally distributed will be summarised as mean ± standard deviation (SD). Normality will be assessed using the Shapiro-Wilk test and visual inspection of histograms and Q-Q plots. For skewed variables, median (interquartile range, IQR) will be used instead (see below).`,
+    sapTraditional: `Normally distributed continuous variables will be expressed as mean ± SD. Normality will be assessed using the Shapiro-Wilk test. Non-normal variables will be expressed as median (IQR).`,
+    jasp: `For descriptive tables:\nAnalyses → Descriptives → Descriptive Statistics\n\n1. Move continuous variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Mean, Median\n   • Dispersion: Std. Deviation, IQR, Range, Minimum, Maximum\n   • Distribution: Skewness, Kurtosis\n3. Under "Plots," check:\n   • Distribution plots (histogram)\n   • Box plots\n   • Q-Q plots`,
+    r: `library(tidyverse)
+library(gtsummary)
+
+# ── Publication-ready Table 1 ──
+df |>
+  select(age, bmi, sbp, hba1c) |>
+  tbl_summary(
+    type = everything() ~ "continuous",
+    statistic = all_continuous() ~ "{mean} ({sd})",
+    digits = all_continuous() ~ 1
+  ) |>
+  add_n() |>
+  modify_header(label = "**Variable**")
+
+# ── Normality check ──
+df |>
+  select(where(is.numeric)) |>
+  pivot_longer(everything()) |>
+  group_by(name) |>
+  summarise(
+    shapiro_p = shapiro.test(value)$p.value,
+    skewness  = e1071::skewness(value),
+    .groups   = "drop"
+  )
+
+# ── Histogram + Q-Q plot ──
+ggplot(df, aes(x = outcome)) +
+  geom_histogram(aes(y = after_stat(density)),
+    bins = 20, fill = "steelblue", alpha = 0.7) +
+  geom_density(colour = "red") +
+  theme_minimal()
+
+ggplot(df, aes(sample = outcome)) +
+  stat_qq() + stat_qq_line(colour = "red") +
+  theme_minimal()`
+  },
+
+  continuous_skewed: {
+    name: "Continuous Variable (Skewed / Non-Normal)",
+    summary: "Median (IQR) or Median (P25–P75)",
+    visual: "Histogram, Box plot, Violin plot",
+    sap: `Continuous variables that are not normally distributed will be summarised as median (interquartile range, IQR: 25th–75th percentile). Range (minimum–maximum) will also be reported. For variables with extreme outliers, the median is preferred as it is robust to outlying values.`,
+    sapTraditional: `Non-normally distributed continuous variables will be expressed as median (IQR). Range will also be reported where relevant.`,
+    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Median\n   • Dispersion: IQR, Range, Minimum, Maximum\n   • Percentile Values: Quartiles (25th, 75th)\n3. Under "Plots," check Box plots and Distribution plots`,
+    r: `library(tidyverse)
+library(gtsummary)
+
+# ── Table with median (IQR) ──
+df |>
+  select(hospital_stay, pain_score, cost) |>
+  tbl_summary(
+    type = everything() ~ "continuous",
+    statistic = all_continuous() ~ "{median} ({p25}, {p75})",
+    digits = all_continuous() ~ 1
+  )
+
+# ── Box plot + violin ──
+ggplot(df, aes(x = group, y = outcome)) +
+  geom_violin(fill = "lightblue", alpha = 0.5) +
+  geom_boxplot(width = 0.2, fill = "white") +
+  theme_minimal()`
+  },
+
+  categorical: {
+    name: "Categorical / Binary Variable",
+    summary: "Frequency (n) and Percentage (%)",
+    visual: "Bar chart, Pie chart (≤ 5 categories)",
+    sap: `Categorical variables will be summarised as frequency and percentage (%). Binary variables will be reported as the count and proportion of the outcome of interest. Percentages will be calculated over non-missing values; the number of missing observations will be noted separately.`,
+    sapTraditional: `Categorical variables will be expressed as frequency and percentage (%).`,
+    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move categorical variables into "Variables"\n2. Under "Statistics," check:\n   • Frequency tables: On\n3. Under "Plots," check:\n   • Bar plots\n   • Pie charts (for ≤ 5 categories)\n\nAlternatively:\nAnalyses → Frequencies → Contingency Tables\nfor cross-tabulations of two categorical variables`,
+    r: `library(tidyverse)
+library(gtsummary)
+
+# ── Frequency table ──
+df |>
+  select(gender, smoking, disease_stage) |>
+  tbl_summary(
+    statistic = all_categorical() ~ "{n} ({p}%)",
+    digits = all_categorical() ~ c(0, 1)
+  )
+
+# ── Bar chart ──
+ggplot(df, aes(x = fct_infreq(disease_stage), fill = disease_stage)) +
+  geom_bar() +
+  geom_text(stat = "count", aes(label = after_stat(count)),
+            vjust = -0.5) +
+  labs(x = "Disease Stage", y = "Count") +
+  theme_minimal() +
+  theme(legend.position = "none")`
+  },
+
+  table_one: {
+    name: "Baseline / Table 1 (by group)",
+    summary: "Stratified summary of all baseline variables by study group",
+    visual: "Publication-ready Table 1",
+    sap: `Baseline characteristics will be summarised by study group. Continuous variables will be expressed as mean ± SD (if normally distributed) or median (IQR) (if skewed). Categorical variables will be expressed as frequency (%). The standardised mean difference (SMD) or p-values from appropriate bivariate tests may be reported to characterise balance across groups.`,
+    sapTraditional: `Baseline characteristics will be presented as Table 1, stratified by group. Continuous variables will be expressed as mean ± SD or median (IQR), and categorical variables as n (%). P-values from bivariate tests will indicate differences between groups.`,
+    jasp: `JASP does not generate a combined Table 1 directly.\n\nWorkaround:\n1. Analyses → Descriptives → Descriptive Statistics\n   • Split by your grouping variable\n   • Check all relevant statistics\n2. Combine with Contingency Tables for categorical variables\n\nFor a true Table 1, use R (gtsummary) — see the R tab.`,
+    r: `library(gtsummary)
+library(tidyverse)
+
+# ── The classic Table 1 ──
+df |>
+  select(group, age, sex, bmi, smoking, disease_stage,
+         sbp, hba1c) |>
+  tbl_summary(
+    by = group,
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = all_continuous() ~ 1,
+    missing = "ifany"        # show missing counts
+  ) |>
+  add_p() |>               # bivariate p-values
+  add_overall() |>          # total column
+  add_n() |>                # sample size per variable
+  modify_header(label = "**Characteristic**") |>
+  bold_labels()
+
+# ── With SMD instead of p-values ──
+library(tableone)
+vars <- c("age", "sex", "bmi", "smoking", "disease_stage")
+CreateTableOne(vars = vars, strata = "group",
+  data = df, test = FALSE, smd = TRUE)
+
+# ── Export to Word/Excel ──
+tbl <- df |> tbl_summary(by = group) |> add_p()
+# To Word:
+tbl |> as_flex_table() |> flextable::save_as_docx(path = "table1.docx")
+# To Excel:
+tbl |> as_tibble() |> writexl::write_xlsx("table1.xlsx")`
+  }
+};
+
+export const DESCRIPTIVE_STEPS = [
+  {
+    id: "desc_goal",
+    title: "What do you want to summarise?",
+    subtitle: "Pick the type of descriptive analysis you need",
+    options: [
+      { value: "single_continuous", label: "A continuous variable", desc: "BP, HbA1c, weight, hospital stay, score", icon: "desc_continuous" },
+      { value: "single_categorical", label: "A categorical / binary variable", desc: "Gender, disease stage, Yes/No outcome", icon: "desc_categorical" },
+      { value: "table_one", label: "Baseline table (Table 1)", desc: "Summarise all variables by study group", icon: "table" },
+    ],
+  },
+  {
+    id: "desc_distribution",
+    title: "Is your continuous variable normally distributed?",
+    subtitle: "Check with histogram, Q-Q plot, or Shapiro-Wilk test",
+    show: (a) => a.desc_goal === "single_continuous",
+    options: [
+      { value: "normal", label: "Yes, Normal", desc: "Bell-shaped, Shapiro-Wilk p > 0.05", icon: "normal" },
+      { value: "skewed", label: "No, Skewed", desc: "Non-normal, Shapiro-Wilk p < 0.05", icon: "skewed" },
+      { value: "not_sure", label: "Not sure yet", desc: "I'll check — show me how to assess normality", icon: "not_sure" },
+    ],
+  },
+];
+
+export function explainReasoning(answers) {
+  const { outcome, comparison, distribution, adjust, sampleSize } = answers;
+  const parts = [];
+
+  const outcomeLabels = { continuous: "continuous", binary: "binary", categorical: "ordered categorical (3+ levels)", time_to_event: "time-to-event (survival)" };
+  const compLabels = { two_independent: "two independent groups", two_paired: "paired/before-after measurements", three_plus: "three or more independent groups", correlation: "association between two variables", single: "a single group vs. a known reference" };
+
+  if (outcome) parts.push(`Your outcome is **${outcomeLabels[outcome] || outcome}**`);
+  if (comparison) parts.push(`with **${compLabels[comparison] || comparison}**`);
+  if (distribution === "normal") parts.push("and the data is **normally distributed**");
+  if (distribution === "skewed") parts.push("and the data is **not normally distributed**");
+  if (sampleSize === "small") parts.push("with a **small sample size** (expected cell count < 5)");
+  if (adjust === "yes") parts.push("You also need to **adjust for confounders**, so a regression model is added.");
+  else if (adjust === "no") parts.push("No confounder adjustment is needed.");
+
+  return parts.join(", ").replace(/,([^,]*)$/, ".$1") || "";
+}
+
+export function recommendDescriptive(answers) {
+  const { desc_goal, desc_distribution } = answers;
+  if (desc_goal === "table_one") return ["table_one"];
+  if (desc_goal === "single_categorical") return ["categorical"];
+  if (desc_goal === "single_continuous") {
+    if (desc_distribution === "normal") return ["continuous_normal"];
+    if (desc_distribution === "skewed") return ["continuous_skewed"];
+    // "not_sure" → show both so they can decide after checking
+    return ["continuous_normal", "continuous_skewed"];
+  }
+  return [];
+}
+
+// ─── Glossary of Key Terms ───
+
+export const GLOSSARY = {
+  "p-value": "The probability of observing results as extreme as the data, assuming the null hypothesis is true. It is NOT the probability that the null hypothesis is true. Smaller p-values indicate stronger evidence against the null.",
+  "confidence interval": "A range of values that is likely to contain the true population parameter. A 95% CI means if you repeated the study 100 times, approximately 95 of the intervals would contain the true value.",
+  "effect size": "A quantitative measure of the magnitude of a phenomenon. Examples: Cohen\u2019s d (mean difference in SD units), Odds Ratio, Hazard Ratio, Correlation coefficient (r). Unlike p-values, effect sizes indicate practical importance.",
+  "null hypothesis": "The default assumption that there is no difference or no association between groups/variables. Statistical tests evaluate the evidence against this hypothesis.",
+  "confounder": "A variable that is associated with both the exposure and the outcome, potentially distorting the true relationship. Adjusted analysis (regression) controls for confounders.",
+  "normality": "The assumption that data follows a bell-shaped (Gaussian) distribution. Assessed using Shapiro-Wilk test, histograms, or Q-Q plots. Many parametric tests require this.",
+  "Type I error": "Rejecting the null hypothesis when it is actually true (a false positive). The conventional threshold (\u03b1 = 0.05) means accepting a 5% risk of this error.",
+  "Type II error": "Failing to reject the null hypothesis when it is actually false (a false negative). Related to statistical power (1 \u2212 \u03b2).",
+  "statistical power": "The probability of correctly detecting a true effect (rejecting a false null hypothesis). Depends on sample size, effect size, and significance level. Typically aimed at \u2265 80%.",
+  "degrees of freedom": "The number of independent values that can vary in a statistical calculation. Affects the shape of test distributions (t, \u03c7\u00b2, F). Generally related to sample size minus the number of estimated parameters.",
+  "odds ratio": "The ratio of odds of an event in the exposed group to the odds in the unexposed group. OR = 1 means no association; OR > 1 means increased odds; OR < 1 means decreased odds.",
+  "hazard ratio": "In survival analysis, the ratio of hazard rates between groups. HR = 1 means equal risk; HR < 1 means lower risk in the treatment group; HR > 1 means higher risk.",
+  "regression coefficient": "The estimated change in the outcome for a one-unit increase in the predictor, holding other variables constant. In linear regression, it is the slope (B); in logistic regression, the log-odds.",
+  "multicollinearity": "When two or more predictors in a regression model are highly correlated with each other. Assessed using VIF (Variance Inflation Factor). VIF > 5\u201310 suggests a problem.",
+  "homoscedasticity": "The assumption that the variance of residuals is constant across all levels of the predictor(s). Violated if a residual plot shows a funnel shape. Required for linear regression.",
+  "non-parametric test": "A test that does not assume a specific distribution (e.g., normality). Uses ranks instead of raw values. Examples: Mann-Whitney, Wilcoxon, Kruskal-Wallis. Less powerful than parametric tests when normality holds, but more robust when it does not.",
+  "Bonferroni correction": "A method to control Type I error when performing multiple comparisons. Divides the significance level (\u03b1) by the number of comparisons. Conservative but simple.",
+  "AUC": "Area Under the ROC Curve. Measures how well a model discriminates between positive and negative cases. AUC = 0.5 means no discrimination (coin flip); AUC = 1.0 means perfect discrimination. Generally: 0.7\u20130.8 acceptable, 0.8\u20130.9 good, >0.9 excellent.",
+  "IQR": "Interquartile Range \u2014 the range between the 25th percentile (Q1) and 75th percentile (Q3). Contains the middle 50% of the data. Used to summarise skewed distributions alongside the median.",
+  "MCID": "Minimum Clinically Important Difference \u2014 the smallest change in an outcome that patients or clinicians would consider meaningful. Used to interpret whether a statistically significant effect is also clinically relevant.",
+};
