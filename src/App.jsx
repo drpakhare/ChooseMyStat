@@ -1,148 +1,144 @@
-import { useState, useCallback } from "react";
-import { TESTS, STEPS, recommend } from "./statTestsData";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive, GLOSSARY } from "./statTestsData";
 import { Analytics } from "@vercel/analytics/react";
 
-const DESCRIPTIVES = {
-  continuous_normal: {
-    name: "Continuous Variable (Normal)",
-    summary: "Mean ± SD",
-    visual: "Histogram with normal curve, Box plot",
-    sap: `Continuous variables that are normally distributed will be summarised as mean ± standard deviation (SD). Normality will be assessed using the Shapiro-Wilk test and visual inspection of histograms and Q-Q plots. For skewed variables, median (interquartile range, IQR) will be used instead (see below).`,
-    sapTraditional: `Normally distributed continuous variables will be expressed as mean ± SD. Normality will be assessed using the Shapiro-Wilk test. Non-normal variables will be expressed as median (IQR).`,
-    jasp: `For descriptive tables:\nAnalyses → Descriptives → Descriptive Statistics\n\n1. Move continuous variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Mean, Median\n   • Dispersion: Std. Deviation, IQR, Range, Minimum, Maximum\n   • Distribution: Skewness, Kurtosis\n3. Under "Plots," check:\n   • Distribution plots (histogram)\n   • Box plots\n   • Q-Q plots`,
-    r: `library(tidyverse)
-library(gtsummary)
+function CopyButton({ text }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className={`absolute top-2 right-2 px-2 py-1 rounded-md text-xs font-medium transition-all duration-200 ${
+        copied
+          ? "bg-green-100 text-green-700 border border-green-300"
+          : "bg-white/80 text-gray-500 border border-gray-200 hover:bg-white hover:text-gray-700 hover:border-gray-300"
+      }`}
+      title="Copy to clipboard"
+    >
+      {copied ? "✓ Copied" : "Copy"}
+    </button>
+  );
+}
 
-# ── Publication-ready Table 1 ──
-df |>
-  select(age, bmi, sbp, hba1c) |>
-  tbl_summary(
-    type = everything() ~ "continuous",
-    statistic = all_continuous() ~ "{mean} ({sd})",
-    digits = all_continuous() ~ 1
-  ) |>
-  add_n() |>
-  modify_header(label = "**Variable**")
-
-# ── Normality check ──
-df |>
-  select(where(is.numeric)) |>
-  pivot_longer(everything()) |>
-  group_by(name) |>
-  summarise(
-    shapiro_p = shapiro.test(value)$p.value,
-    skewness  = e1071::skewness(value),
-    .groups   = "drop"
-  )
-
-# ── Histogram + Q-Q plot ──
-ggplot(df, aes(x = outcome)) +
-  geom_histogram(aes(y = after_stat(density)),
-    bins = 20, fill = "steelblue", alpha = 0.7) +
-  geom_density(colour = "red") +
-  theme_minimal()
-
-ggplot(df, aes(sample = outcome)) +
-  stat_qq() + stat_qq_line(colour = "red") +
-  theme_minimal()`
-  },
-
-  continuous_skewed: {
-    name: "Continuous Variable (Skewed / Non-Normal)",
-    summary: "Median (IQR) or Median (P25–P75)",
-    visual: "Histogram, Box plot, Violin plot",
-    sap: `Continuous variables that are not normally distributed will be summarised as median (interquartile range, IQR: 25th–75th percentile). Range (minimum–maximum) will also be reported. For variables with extreme outliers, the median is preferred as it is robust to outlying values.`,
-    sapTraditional: `Non-normally distributed continuous variables will be expressed as median (IQR). Range will also be reported where relevant.`,
-    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move variables into "Variables"\n2. Under "Statistics," check:\n   • Central Tendency: Median\n   • Dispersion: IQR, Range, Minimum, Maximum\n   • Percentile Values: Quartiles (25th, 75th)\n3. Under "Plots," check Box plots and Distribution plots`,
-    r: `library(tidyverse)
-library(gtsummary)
-
-# ── Table with median (IQR) ──
-df |>
-  select(hospital_stay, pain_score, cost) |>
-  tbl_summary(
-    type = everything() ~ "continuous",
-    statistic = all_continuous() ~ "{median} ({p25}, {p75})",
-    digits = all_continuous() ~ 1
-  )
-
-# ── Box plot + violin ──
-ggplot(df, aes(x = group, y = outcome)) +
-  geom_violin(fill = "lightblue", alpha = 0.5) +
-  geom_boxplot(width = 0.2, fill = "white") +
-  theme_minimal()`
-  },
-
-  categorical: {
-    name: "Categorical / Binary Variable",
-    summary: "Frequency (n) and Percentage (%)",
-    visual: "Bar chart, Pie chart (≤ 5 categories)",
-    sap: `Categorical variables will be summarised as frequency and percentage (%). Binary variables will be reported as the count and proportion of the outcome of interest. Percentages will be calculated over non-missing values; the number of missing observations will be noted separately.`,
-    sapTraditional: `Categorical variables will be expressed as frequency and percentage (%).`,
-    jasp: `Analyses → Descriptives → Descriptive Statistics\n\n1. Move categorical variables into "Variables"\n2. Under "Statistics," check:\n   • Frequency tables: On\n3. Under "Plots," check:\n   • Bar plots\n   • Pie charts (for ≤ 5 categories)\n\nAlternatively:\nAnalyses → Frequencies → Contingency Tables\nfor cross-tabulations of two categorical variables`,
-    r: `library(tidyverse)
-library(gtsummary)
-
-# ── Frequency table ──
-df |>
-  select(gender, smoking, disease_stage) |>
-  tbl_summary(
-    statistic = all_categorical() ~ "{n} ({p}%)",
-    digits = all_categorical() ~ c(0, 1)
-  )
-
-# ── Bar chart ──
-ggplot(df, aes(x = fct_infreq(disease_stage), fill = disease_stage)) +
-  geom_bar() +
-  geom_text(stat = "count", aes(label = after_stat(count)),
-            vjust = -0.5) +
-  labs(x = "Disease Stage", y = "Count") +
-  theme_minimal() +
-  theme(legend.position = "none")`
-  },
-
-  table_one: {
-    name: "Baseline / Table 1 (by group)",
-    summary: "Stratified summary of all baseline variables by study group",
-    visual: "Publication-ready Table 1",
-    sap: `Baseline characteristics will be summarised by study group. Continuous variables will be expressed as mean ± SD (if normally distributed) or median (IQR) (if skewed). Categorical variables will be expressed as frequency (%). The standardised mean difference (SMD) or p-values from appropriate bivariate tests may be reported to characterise balance across groups.`,
-    sapTraditional: `Baseline characteristics will be presented as Table 1, stratified by group. Continuous variables will be expressed as mean ± SD or median (IQR), and categorical variables as n (%). P-values from bivariate tests will indicate differences between groups.`,
-    jasp: `JASP does not generate a combined Table 1 directly.\n\nWorkaround:\n1. Analyses → Descriptives → Descriptive Statistics\n   • Split by your grouping variable\n   • Check all relevant statistics\n2. Combine with Contingency Tables for categorical variables\n\nFor a true Table 1, use R (gtsummary) — see the R tab.`,
-    r: `library(gtsummary)
-library(tidyverse)
-
-# ── The classic Table 1 ──
-df |>
-  select(group, age, sex, bmi, smoking, disease_stage,
-         sbp, hba1c) |>
-  tbl_summary(
-    by = group,
-    statistic = list(
-      all_continuous()  ~ "{mean} ({sd})",
-      all_categorical() ~ "{n} ({p}%)"
-    ),
-    digits = all_continuous() ~ 1,
-    missing = "ifany"        # show missing counts
-  ) |>
-  add_p() |>               # bivariate p-values
-  add_overall() |>          # total column
-  add_n() |>                # sample size per variable
-  modify_header(label = "**Characteristic**") |>
-  bold_labels()
-
-# ── With SMD instead of p-values ──
-library(tableone)
-vars <- c("age", "sex", "bmi", "smoking", "disease_stage")
-CreateTableOne(vars = vars, strata = "group",
-  data = df, test = FALSE, smd = TRUE)
-
-# ── Export to Word/Excel ──
-tbl <- df |> tbl_summary(by = group) |> add_p()
-# To Word:
-tbl |> as_flex_table() |> flextable::save_as_docx(path = "table1.docx")
-# To Excel:
-tbl |> as_tibble() |> writexl::write_xlsx("table1.xlsx")`
-  }
+// ─── SVG Icon set (24×24, consistent stroke style) ───
+const ICONS = {
+  // Outcome types
+  continuous: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M3 12h2l3-7 4 14 3-7h6" />
+    </svg>
+  ),
+  binary: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="8" cy="12" r="3" /><circle cx="16" cy="12" r="3" /><path d="M11 12h2" />
+    </svg>
+  ),
+  categorical: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <rect x="4" y="14" width="4" height="6" rx="1" /><rect x="10" y="8" width="4" height="12" rx="1" /><rect x="16" y="4" width="4" height="16" rx="1" />
+    </svg>
+  ),
+  time_to_event: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" />
+    </svg>
+  ),
+  // Comparison types
+  two_independent: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="8" cy="8" r="3" /><circle cx="16" cy="8" r="3" /><path d="M4 20c0-3 2-5 4-5s4 2 4 5" /><path d="M12 20c0-3 2-5 4-5s4 2 4 5" />
+    </svg>
+  ),
+  two_paired: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M17 1l4 4-4 4" /><path d="M3 11V9a4 4 0 014-4h14" /><path d="M7 23l-4-4 4-4" /><path d="M21 13v2a4 4 0 01-4 4H3" />
+    </svg>
+  ),
+  three_plus: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="6" cy="8" r="2.5" /><circle cx="12" cy="8" r="2.5" /><circle cx="18" cy="8" r="2.5" /><path d="M2 19c0-2.5 1.5-4 4-4s4 1.5 4 4" /><path d="M8 19c0-2.5 1.5-4 4-4s4 1.5 4 4" /><path d="M14 19c0-2.5 1.5-4 4-4s4 1.5 4 4" />
+    </svg>
+  ),
+  correlation: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M3 20L21 4" /><circle cx="6" cy="16" r="1.5" fill="currentColor" /><circle cx="10" cy="14" r="1.5" fill="currentColor" /><circle cx="14" cy="10" r="1.5" fill="currentColor" /><circle cx="18" cy="7" r="1.5" fill="currentColor" />
+    </svg>
+  ),
+  single: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="8" r="4" /><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6" />
+    </svg>
+  ),
+  // Distribution
+  normal: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M2 20 C4 20, 6 18, 8 14 C10 8, 11 4, 12 4 C13 4, 14 8, 16 14 C18 18, 20 20, 22 20" />
+    </svg>
+  ),
+  skewed: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M2 20 C3 20, 4 19, 5 16 C6 11, 7 5, 8 4 C9 5, 11 10, 14 15 C17 18, 19 20, 22 20" />
+    </svg>
+  ),
+  // Adjust
+  adjust_no: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  ),
+  adjust_yes: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z" />
+    </svg>
+  ),
+  // Sample size
+  small_sample: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+    </svg>
+  ),
+  large_sample: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  ),
+  // Descriptive types
+  desc_continuous: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <path d="M4 20h16" /><path d="M4 20V10" /><rect x="7" y="6" width="3" height="14" rx="0.5" opacity="0.3" fill="currentColor" /><rect x="11" y="3" width="3" height="17" rx="0.5" opacity="0.5" fill="currentColor" /><rect x="15" y="8" width="3" height="12" rx="0.5" opacity="0.3" fill="currentColor" />
+    </svg>
+  ),
+  desc_categorical: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="9" /><path d="M12 3v9l6.5 4" /><path d="M12 12L6 17" />
+    </svg>
+  ),
+  table: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <rect x="3" y="3" width="18" height="18" rx="2" /><path d="M3 9h18" /><path d="M3 15h18" /><path d="M9 3v18" />
+    </svg>
+  ),
+  not_sure: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
+      <circle cx="12" cy="12" r="9" /><path d="M9 9c0-1.5 1.3-3 3-3s3 1.5 3 3c0 2-3 2.5-3 4.5" /><circle cx="12" cy="18" r="0.5" fill="currentColor" />
+    </svg>
+  ),
+  // Home screen
+  describe: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <rect x="4" y="14" width="4" height="6" rx="1" /><rect x="10" y="8" width="4" height="12" rx="1" /><rect x="16" y="4" width="4" height="16" rx="1" />
+    </svg>
+  ),
+  test: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+      <circle cx="12" cy="4" r="2" /><path d="M12 6v4" /><path d="M12 10l-6 5" /><path d="M12 10l6 5" /><circle cx="6" cy="17" r="2.5" /><circle cx="18" cy="17" r="2.5" />
+    </svg>
+  ),
 };
 
 function Breadcrumbs({ answers, steps }) {
