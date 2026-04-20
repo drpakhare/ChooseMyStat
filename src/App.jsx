@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from "react";
-import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive, GLOSSARY } from "./statTestsData";
+import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive, GLOSSARY, DIAGNOSTIC_TESTS, DIAGNOSTIC_STEPS, recommendDiagnostic, explainDiagnosticReasoning, AGREEMENT_TESTS, AGREEMENT_STEPS, recommendAgreement, explainAgreementReasoning } from "./statTestsData";
 import { Analytics } from "@vercel/analytics/react";
 
 function CopyButton({ text }) {
@@ -225,8 +225,8 @@ function ProgressDots({ total, current }) {
 
 // ─── Test Result Card with Tabs ───
 
-function TestResult({ testKey, useTraditional }) {
-  const t = TESTS[testKey];
+function TestResult({ testKey, useTraditional, testSource }) {
+  const t = (testSource || TESTS)[testKey];
   const [tab, setTab] = useState("sap");
   if (!t) return null;
 
@@ -561,7 +561,7 @@ export default function ChooseMyStat() {
     }
   }, [showResults, mode, answers]);
 
-  const activeSteps = mode === "descriptive" ? DESCRIPTIVE_STEPS : STEPS;
+  const activeSteps = mode === "descriptive" ? DESCRIPTIVE_STEPS : mode === "diagnostic" ? DIAGNOSTIC_STEPS : mode === "agreement" ? AGREEMENT_STEPS : STEPS;
   const visibleSteps = activeSteps.filter((s) => !s.show || s.show(answers));
   const currentStep = visibleSteps[stepIndex];
 
@@ -603,14 +603,14 @@ export default function ChooseMyStat() {
 
   // ─── Plan Builder helpers ───
   const addToPlan = () => {
-    const curResults = mode === "descriptive" ? recommendDescriptive(answers) : recommend(answers);
+    const curResults = mode === "descriptive" ? recommendDescriptive(answers) : mode === "diagnostic" ? recommendDiagnostic(answers) : mode === "agreement" ? recommendAgreement(answers) : recommend(answers);
     const item = {
       id: Date.now(),
       mode,
       answers: { ...answers },
       resultKeys: curResults,
       useTraditional,
-      reasoning: mode === "inferential" ? explainReasoning(answers) : null,
+      reasoning: mode === "inferential" ? explainReasoning(answers) : mode === "diagnostic" ? explainDiagnosticReasoning(answers) : mode === "agreement" ? explainAgreementReasoning(answers) : null,
     };
     setPlanItems((prev) => [...prev, item]);
     setShowPlan(true);
@@ -644,13 +644,13 @@ export default function ChooseMyStat() {
 
     planItems.forEach((item, i) => {
       const num = i + 1;
-      const testData = item.mode === "descriptive"
-        ? item.resultKeys.map((k) => DESCRIPTIVES[k])
-        : item.resultKeys.map((k) => TESTS[k]);
+      const testLookup = item.mode === "descriptive" ? DESCRIPTIVES : item.mode === "diagnostic" ? DIAGNOSTIC_TESTS : item.mode === "agreement" ? AGREEMENT_TESTS : TESTS;
+      const testData = item.resultKeys.map((k) => testLookup[k]);
       const inputStr = Object.entries(item.answers).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v.replace(/_/g, " ")}`).join(", ");
 
+      const modeLabels = { descriptive: "Descriptive Analysis", inferential: "Inferential Test", diagnostic: "Diagnostic Accuracy", agreement: "Agreement / Reliability" };
       lines.push(`OBJECTIVE ${num}`, "─".repeat(30));
-      lines.push(`Type: ${item.mode === "descriptive" ? "Descriptive Analysis" : "Inferential Test"}`);
+      lines.push(`Type: ${modeLabels[item.mode] || item.mode}`);
       lines.push(`Inputs: ${inputStr}`);
       if (item.reasoning) lines.push(`Reasoning: ${item.reasoning.replace(/\*\*/g, "")}`);
       lines.push("");
@@ -681,7 +681,7 @@ export default function ChooseMyStat() {
   };
 
   const results = showResults
-    ? (mode === "descriptive" ? recommendDescriptive(answers) : recommend(answers))
+    ? (mode === "descriptive" ? recommendDescriptive(answers) : mode === "diagnostic" ? recommendDiagnostic(answers) : mode === "agreement" ? recommendAgreement(answers) : recommend(answers))
     : [];
 
   // ─── Shared dark-mode class helpers ───
@@ -764,6 +764,44 @@ export default function ChooseMyStat() {
                 </div>
               </div>
             </button>
+
+            <button
+              onClick={() => setMode("diagnostic")}
+              className={`w-full text-left rounded-2xl shadow-lg border-2 ${card} ${dark ? "hover:border-rose-500" : "hover:border-rose-400"} hover:shadow-xl transition-all p-6 group`}
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-rose-500 group-hover:text-rose-400 transition-colors">
+                  <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                  <div className={`text-lg font-bold ${textPrimary} group-hover:text-rose-500`}>
+                    Diagnostic Accuracy
+                  </div>
+                  <div className={`text-sm ${textSecondary} mt-1`}>
+                    ROC curves, AUC, sensitivity, specificity, PPV, NPV, likelihood ratios, and optimal cutoffs
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setMode("agreement")}
+              className={`w-full text-left rounded-2xl shadow-lg border-2 ${card} ${dark ? "hover:border-amber-500" : "hover:border-amber-400"} hover:shadow-xl transition-all p-6 group`}
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-amber-500 group-hover:text-amber-400 transition-colors">
+                  <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                </div>
+                <div>
+                  <div className={`text-lg font-bold ${textPrimary} group-hover:text-amber-500`}>
+                    Agreement / Reliability
+                  </div>
+                  <div className={`text-sm ${textSecondary} mt-1`}>
+                    Cohen's kappa, weighted kappa, ICC, and Bland-Altman analysis for inter-rater and method comparison studies
+                  </div>
+                </div>
+              </div>
+            </button>
           </div>
 
           {/* ─── Core Concepts ─── */}
@@ -836,16 +874,16 @@ export default function ChooseMyStat() {
                   {/* Saved items list */}
                   <div className="space-y-2">
                     {planItems.map((item, idx) => {
-                      const testNames = item.mode === "descriptive"
-                        ? item.resultKeys.map((k) => DESCRIPTIVES[k]?.name || k)
-                        : item.resultKeys.map((k) => TESTS[k]?.name || k);
+                      const planLookup = item.mode === "descriptive" ? DESCRIPTIVES : item.mode === "diagnostic" ? DIAGNOSTIC_TESTS : item.mode === "agreement" ? AGREEMENT_TESTS : TESTS;
+                      const testNames = item.resultKeys.map((k) => planLookup[k]?.name || k);
+                      const planModeLabels = { descriptive: "Descriptive", inferential: "Inferential", diagnostic: "Diagnostic", agreement: "Agreement" };
                       return (
                         <div key={item.id} className={`flex items-center gap-2 rounded-lg px-3 py-2 ${dark ? "bg-gray-900" : "bg-white"}`}>
                           <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full ${dark ? "bg-emerald-900 text-emerald-300" : "bg-emerald-200 text-emerald-700"}`}>{idx + 1}</span>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-medium truncate ${dark ? "text-gray-200" : "text-gray-800"}`}>{testNames.join(", ")}</p>
                             <p className={`text-xs truncate ${dark ? "text-gray-500" : "text-gray-400"}`}>
-                              {item.mode === "descriptive" ? "Descriptive" : "Inferential"} · {Object.values(item.answers).join(" → ")}
+                              {planModeLabels[item.mode] || item.mode} · {Object.values(item.answers).join(" → ")}
                             </p>
                           </div>
                           <div className="flex gap-1 flex-shrink-0">
@@ -989,7 +1027,7 @@ export default function ChooseMyStat() {
   }
 
   // ─── Question / Results Flow (shared by both modes) ───
-  const accentColor = mode === "descriptive" ? "teal" : "indigo";
+  const accentColor = mode === "descriptive" ? "teal" : mode === "diagnostic" ? "rose" : mode === "agreement" ? "amber" : "indigo";
 
   return (
     <div className={`min-h-screen ${bg} flex items-start justify-center p-4 pt-8 transition-colors duration-300`}>
@@ -1001,7 +1039,7 @@ export default function ChooseMyStat() {
             ChooseMyStat
           </button>
           <p className={`text-sm ${textSecondary} mt-1`}>
-            {mode === "descriptive" ? "Describe My Variables" : "Choose a Statistical Test"}
+            {mode === "descriptive" ? "Describe My Variables" : mode === "diagnostic" ? "Diagnostic Accuracy" : mode === "agreement" ? "Agreement / Reliability" : "Choose a Statistical Test"}
           </p>
           {planItems.length > 0 && (
             <button
@@ -1061,7 +1099,7 @@ export default function ChooseMyStat() {
             {/* Results header */}
             <div className={`rounded-2xl shadow-lg border p-5 mb-5 ${card}`}>
               <h2 className={`text-lg font-bold ${textPrimary} mb-1`}>
-                {mode === "descriptive" ? "Recommended Summary" : "Recommended Analysis"}
+                {mode === "descriptive" ? "Recommended Summary" : mode === "diagnostic" ? "Recommended Diagnostic Method" : mode === "agreement" ? "Recommended Agreement Statistic" : "Recommended Analysis"}
               </h2>
               <p className={`text-sm ${textSecondary} mb-1`}>Based on your inputs:</p>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -1087,16 +1125,18 @@ export default function ChooseMyStat() {
               </button>
 
               {/* Why this test? */}
-              {mode === "inferential" && (
+              {(mode === "inferential" || mode === "diagnostic" || mode === "agreement") && (
                 <div className={`rounded-lg px-4 py-3 mb-3 ${dark ? "bg-indigo-950 border border-indigo-800" : "bg-indigo-50 border border-indigo-100"}`}>
-                  <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${dark ? "text-indigo-400" : "text-indigo-600"}`}>Why this test?</p>
+                  <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
+                    {mode === "diagnostic" ? "Why this method?" : mode === "agreement" ? "Why this statistic?" : "Why this test?"}
+                  </p>
                   <p className={`text-sm leading-relaxed ${dark ? "text-indigo-200" : "text-indigo-900"}`}
-                     dangerouslySetInnerHTML={{ __html: explainReasoning(answers).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
+                     dangerouslySetInnerHTML={{ __html: (mode === "diagnostic" ? explainDiagnosticReasoning(answers) : mode === "agreement" ? explainAgreementReasoning(answers) : explainReasoning(answers)).replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') }}
                   />
                 </div>
               )}
 
-              {mode === "inferential" && results.length > 1 && (
+              {(mode === "inferential" || mode === "agreement") && results.length > 1 && (
                 <p className={`text-xs ${textMuted} italic mb-3`}>
                   Multiple tests: use the unadjusted test first, then the regression model for adjusted analysis.
                 </p>
@@ -1135,6 +1175,10 @@ export default function ChooseMyStat() {
             {/* Result cards */}
             {mode === "descriptive"
               ? results.map((key) => <DescriptiveResult key={key} descKey={key} useTraditional={useTraditional} />)
+              : mode === "diagnostic"
+              ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={DIAGNOSTIC_TESTS} />)
+              : mode === "agreement"
+              ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={AGREEMENT_TESTS} />)
               : results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} />)
             }
 

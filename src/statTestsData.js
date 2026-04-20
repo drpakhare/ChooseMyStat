@@ -1157,6 +1157,446 @@ export function recommendDescriptive(answers) {
   return [];
 }
 
+// ━━━ DIAGNOSTIC ACCURACY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const DIAGNOSTIC_TESTS = {
+
+  diagnostic_2x2: {
+    name: "Diagnostic Accuracy (2×2 Table)",
+    when: "Evaluating the performance of a binary diagnostic test (positive/negative) against a reference standard (gold standard).",
+    assumptions: "Independent observations, a valid reference standard applied to all subjects (no verification bias), representative disease spectrum.",
+
+    sap: `The diagnostic accuracy of [index test] will be evaluated against [reference standard]. Sensitivity, specificity, positive predictive value (PPV), negative predictive value (NPV), positive likelihood ratio (LR+), and negative likelihood ratio (LR−) will be calculated from the 2×2 contingency table with exact 95% confidence intervals (Clopper-Pearson method). The overall accuracy (proportion correctly classified) will also be reported. Results will be presented following the STARD 2015 reporting guidelines.`,
+    sapTraditional: `The diagnostic accuracy of [index test] will be evaluated against [reference standard]. Sensitivity, specificity, positive predictive value (PPV), negative predictive value (NPV), positive likelihood ratio (LR+), and negative likelihood ratio (LR−) will be calculated with 95% confidence intervals. A p-value < 0.05 will be considered statistically significant where applicable.`,
+
+    example: `The rapid antigen test had a sensitivity of 87.5% (95% CI: 78.2–93.8) and specificity of 92.3% (95% CI: 86.4–96.2) against RT-PCR as the reference standard. The PPV was 84.0% (95% CI: 74.1–91.2) and NPV was 94.1% (95% CI: 88.7–97.4). The LR+ was 11.4 (95% CI: 6.4–20.1) and LR− was 0.14 (95% CI: 0.07–0.24), indicating strong diagnostic utility. Overall accuracy was 90.6% (210/232).`,
+    exampleTraditional: `The rapid antigen test demonstrated sensitivity of 87.5% (95% CI: 78.2–93.8%) and specificity of 92.3% (95% CI: 86.4–96.2%) when compared against RT-PCR. The PPV was 84.0% and NPV was 94.1%. The LR+ was 11.4 and LR− was 0.14.`,
+
+    report: "2×2 table, Sensitivity with 95% CI, Specificity with 95% CI, PPV, NPV, LR+, LR−, Overall accuracy, STARD flow diagram",
+
+    jasp: `JASP does not have a built-in diagnostic accuracy module.
+
+Use R or an online calculator (e.g., MedCalc, OpenEpi) instead.
+
+For 2×2 tables in JASP:
+1. Frequencies → Contingency Tables
+2. Enter your test result vs reference standard
+3. This gives chi-square and odds ratio but NOT
+   sensitivity/specificity/PPV/NPV directly.
+
+→ Recommended: Use R code provided or an online
+  diagnostic accuracy calculator.`,
+
+    r: `library(caret)
+library(epiR)
+
+# ── Create 2×2 table ──
+# Rows = Test result (Positive, Negative)
+# Cols = Reference (Disease+, Disease−)
+# IMPORTANT: epiR expects this exact layout
+tab <- matrix(c(TP, FP, FN, TN), nrow = 2, byrow = TRUE,
+              dimnames = list(
+                Test = c("Positive", "Negative"),
+                Reference = c("Disease+", "Disease-")))
+
+# ── Diagnostic accuracy with 95% CI ──
+epi.tests(as.table(tab), conf.level = 0.95)
+# Returns: Se, Sp, PPV, NPV, LR+, LR-, DOR, accuracy
+
+# ── Alternative: manual calculation ──
+TP <- tab[1,1]; FP <- tab[1,2]
+FN <- tab[2,1]; TN <- tab[2,2]
+
+sensitivity <- TP / (TP + FN)
+specificity <- TN / (TN + FP)
+ppv <- TP / (TP + FP)
+npv <- TN / (TN + FN)
+lr_pos <- sensitivity / (1 - specificity)
+lr_neg <- (1 - sensitivity) / specificity
+accuracy <- (TP + TN) / (TP + FP + FN + TN)
+
+# ── Exact CIs (Clopper-Pearson) ──
+binom.test(TP, TP + FN)$conf.int  # Sensitivity CI
+binom.test(TN, TN + FP)$conf.int  # Specificity CI`
+  },
+
+  roc_auc: {
+    name: "ROC Curve & AUC Analysis",
+    when: "Evaluating the discriminative ability of a continuous or ordinal test variable (e.g., biomarker, score) for distinguishing between two groups (disease vs. no disease).",
+    assumptions: "Binary outcome (disease present/absent), independent observations, adequate sample in both groups.",
+
+    sap: `The discriminative ability of [biomarker/score] for [condition] will be assessed using Receiver Operating Characteristic (ROC) curve analysis. The Area Under the ROC Curve (AUC) with 95% confidence interval (DeLong method) will be the primary measure of discrimination. The optimal cutoff will be determined using Youden's index (J = Sensitivity + Specificity − 1), and sensitivity, specificity, PPV, NPV, and likelihood ratios at this cutoff will be reported. If multiple markers are evaluated, AUC values will be compared using the DeLong test for correlated ROC curves.`,
+    sapTraditional: `The discriminative ability of [biomarker/score] for [condition] will be assessed using Receiver Operating Characteristic (ROC) curve analysis. The Area Under the Curve (AUC) with 95% confidence interval will be calculated. The optimal cutoff value will be determined using Youden's index. Sensitivity and specificity at the optimal cutoff will be reported. AUC > 0.7 will be considered acceptable discrimination. A p-value < 0.05 will be considered statistically significant.`,
+
+    example: `Serum ferritin showed good discrimination for iron deficiency anaemia with an AUC of 0.87 (95% CI: 0.81–0.93, p < 0.001). The optimal cutoff was 30 ng/mL (Youden's index = 0.68), yielding sensitivity of 88.2% (95% CI: 79.4–94.2), specificity of 79.5% (95% CI: 71.0–86.5), PPV of 76.9%, and NPV of 89.7%. The LR+ of 4.3 indicates that a ferritin ≤ 30 ng/mL is 4.3 times more likely in patients with iron deficiency anaemia than without.`,
+    exampleTraditional: `The AUC for serum ferritin in diagnosing iron deficiency anaemia was 0.87 (95% CI: 0.81–0.93), which was statistically significant (p < 0.001). At the optimal cutoff of 30 ng/mL (Youden's index), the sensitivity was 88.2% and specificity was 79.5%.`,
+
+    report: "ROC curve figure, AUC with 95% CI and p-value, optimal cutoff (Youden's), Sensitivity & Specificity at cutoff, PPV, NPV, LR+, LR−",
+
+    jasp: `JASP does not currently have a built-in ROC analysis module.
+
+→ Use R (pROC package) for ROC analysis.
+
+Alternative free tools:
+• MedCalc (free trial): Diagnostic test evaluation
+• EasyROC (web-based): https://www.biosoft.hacettepe.edu.tr/easyROC/
+• OpenEpi: Open-source epidemiologic calculators`,
+
+    r: `library(pROC)
+library(cutpointr)
+library(ggplot2)
+
+# ── ROC analysis ──
+roc_obj <- roc(df$disease_status, df$biomarker,
+               levels = c("Negative", "Positive"),
+               direction = "<")  # lower values = negative
+
+# ── AUC with 95% CI (DeLong) ──
+auc(roc_obj)
+ci.auc(roc_obj, conf.level = 0.95)
+
+# ── Optimal cutoff (Youden's index) ──
+coords(roc_obj, "best", best.method = "youden",
+       ret = c("threshold", "sensitivity", "specificity",
+               "ppv", "npv"))
+
+# ── Alternative: cutpointr (tidy approach) ──
+cp <- cutpointr(df, biomarker, disease_status,
+                method = maximize_metric,
+                metric = youden)
+summary(cp)
+
+# ── Plot ROC curve ──
+ggroc(roc_obj, colour = "steelblue", linewidth = 1.2) +
+  geom_segment(aes(x = 1, xend = 0, y = 0, yend = 1),
+               linetype = "dashed", colour = "grey50") +
+  annotate("text", x = 0.3, y = 0.2,
+           label = paste0("AUC = ", round(auc(roc_obj), 3))) +
+  theme_minimal() +
+  labs(title = "ROC Curve", x = "Specificity", y = "Sensitivity")
+
+# ── Compare two ROC curves (DeLong test) ──
+roc1 <- roc(df$disease, df$marker1)
+roc2 <- roc(df$disease, df$marker2)
+roc.test(roc1, roc2, method = "delong")`
+  }
+};
+
+export const DIAGNOSTIC_STEPS = [
+  {
+    id: "diag_test_type",
+    title: "What type is your diagnostic test result?",
+    subtitle: "The test you are evaluating against a reference/gold standard",
+    options: [
+      { value: "binary", label: "Binary (Positive / Negative)", desc: "Rapid test, culture result, clinical sign present/absent", icon: "🔘" },
+      { value: "continuous", label: "Continuous / Score", desc: "Biomarker level, risk score, lab value with numeric range", icon: "📏" },
+    ],
+  },
+];
+
+export function recommendDiagnostic(answers) {
+  const { diag_test_type } = answers;
+  if (diag_test_type === "binary") return ["diagnostic_2x2"];
+  if (diag_test_type === "continuous") return ["roc_auc"];
+  return [];
+}
+
+export function explainDiagnosticReasoning(answers) {
+  const { diag_test_type } = answers;
+  if (diag_test_type === "binary") {
+    return "Your diagnostic test gives a **binary result** (positive/negative). You need a **2×2 diagnostic accuracy table** with sensitivity, specificity, PPV, NPV, and likelihood ratios against your reference standard.";
+  }
+  if (diag_test_type === "continuous") {
+    return "Your diagnostic test gives a **continuous value** (e.g., biomarker level, score). You need **ROC curve analysis** to determine the AUC (discrimination ability) and the optimal cutoff using Youden's index, along with sensitivity and specificity at that cutoff.";
+  }
+  return "";
+}
+
+// ━━━ AGREEMENT / RELIABILITY ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export const AGREEMENT_TESTS = {
+
+  cohen_kappa: {
+    name: "Cohen's Kappa (Unweighted)",
+    when: "Measuring agreement between two raters on a nominal/categorical variable (e.g., both raters classify samples as positive/negative, or into diagnostic categories).",
+    assumptions: "Two raters, same set of subjects, nominal (unordered) categories, categories are mutually exclusive and exhaustive.",
+
+    sap: `Inter-rater agreement between [rater 1] and [rater 2] for [classification] will be assessed using Cohen's kappa (κ). The kappa coefficient with 95% confidence interval will be reported and interpreted as: < 0.20 poor, 0.21–0.40 fair, 0.41–0.60 moderate, 0.61–0.80 substantial, and 0.81–1.00 almost perfect agreement (Landis & Koch, 1977). The observed agreement (proportion of concordant classifications) will also be reported.`,
+    sapTraditional: `Inter-rater agreement between [rater 1] and [rater 2] for [classification] will be assessed using Cohen's kappa (κ) with 95% confidence interval. Kappa values will be interpreted as: < 0.20 poor, 0.21–0.40 fair, 0.41–0.60 moderate, 0.61–0.80 substantial, and 0.81–1.00 almost perfect agreement. A p-value < 0.05 will be considered statistically significant.`,
+
+    example: `Two pathologists independently classified 120 biopsy specimens as benign, atypical, or malignant. The observed agreement was 82.5% (99/120). Cohen's kappa was 0.72 (95% CI: 0.61–0.83, p < 0.001), indicating substantial inter-rater agreement. Disagreements were most frequent between benign and atypical categories (14/21 discordant cases).`,
+    exampleTraditional: `The inter-rater agreement between the two pathologists was substantial, with a Cohen's kappa of 0.72 (95% CI: 0.61–0.83, p < 0.001). The observed agreement was 82.5%.`,
+
+    report: "Observed agreement (%), Expected agreement (%), Kappa with 95% CI, p-value, Interpretation (Landis & Koch scale), Cross-tabulation of rater classifications",
+
+    jasp: `Frequencies → Contingency Tables
+
+1. Enter Rater 1 classification as Rows
+2. Enter Rater 2 classification as Columns
+3. Under Statistics, check:
+   • Nominal: Kappa (Cohen's kappa)
+4. The output will show:
+   • Cross-tabulation
+   • Kappa coefficient with standard error
+   • Approximate significance`,
+
+    r: `library(irr)
+library(psych)
+library(vcd)
+
+# ── Data setup: two raters, same subjects ──
+# ratings should be a data frame with columns: rater1, rater2
+# containing factor/character values
+
+# ── Cohen's kappa ──
+kappa2(ratings[, c("rater1", "rater2")])
+# Returns: kappa, z-statistic, p-value
+
+# ── With 95% CI (psych package) ──
+cohen.kappa(table(ratings$rater1, ratings$rater2))
+# Returns: kappa, weighted kappa, CIs
+
+# ── Cross-tabulation ──
+tab <- table(Rater1 = ratings$rater1, Rater2 = ratings$rater2)
+print(tab)
+
+# ── Observed agreement ──
+sum(diag(tab)) / sum(tab)
+
+# ── Visualise agreement ──
+library(ggplot2)
+ggplot(ratings, aes(x = rater1, y = rater2)) +
+  geom_jitter(width = 0.2, height = 0.2, alpha = 0.5) +
+  theme_minimal() +
+  labs(title = "Agreement Plot", x = "Rater 1", y = "Rater 2")`
+  },
+
+  weighted_kappa: {
+    name: "Weighted Kappa",
+    when: "Measuring agreement between two raters on an ordinal variable (e.g., severity grades: mild/moderate/severe, Likert scales), where some disagreements are more serious than others.",
+    assumptions: "Two raters, same set of subjects, ordinal (ordered) categories. Linear or quadratic weights penalise distant disagreements more heavily.",
+
+    sap: `Inter-rater agreement for [ordinal classification] will be assessed using weighted kappa (κw) with quadratic weights, which penalises larger disagreements proportionally more than minor ones. The weighted kappa with 95% confidence interval will be reported and interpreted using the Landis and Koch scale. The unweighted kappa will also be reported for comparison. A cross-tabulation of ratings will be presented.`,
+    sapTraditional: `Inter-rater agreement for [ordinal classification] will be assessed using weighted kappa with quadratic weights and 95% confidence interval. Kappa values will be interpreted as: < 0.20 poor, 0.21–0.40 fair, 0.41–0.60 moderate, 0.61–0.80 substantial, and 0.81–1.00 almost perfect agreement. A p-value < 0.05 will be considered statistically significant.`,
+
+    example: `Two radiologists graded 95 knee MRI scans on a 4-point osteoarthritis severity scale (none/mild/moderate/severe). The weighted kappa (quadratic weights) was 0.78 (95% CI: 0.68–0.88), indicating substantial agreement. The unweighted kappa was 0.64. Most disagreements were between adjacent categories (mild vs. moderate: 12/18 discordant cases), with no case differing by more than one grade.`,
+    exampleTraditional: `The weighted kappa (quadratic weights) for osteoarthritis grading between the two radiologists was 0.78 (95% CI: 0.68–0.88, p < 0.001), indicating substantial agreement. The unweighted kappa was 0.64.`,
+
+    report: "Cross-tabulation, Weighted kappa (quadratic) with 95% CI, Unweighted kappa for comparison, Observed agreement (%), Weight matrix used",
+
+    jasp: `Frequencies → Contingency Tables
+
+1. Enter Rater 1 as Rows, Rater 2 as Columns
+2. Under Statistics:
+   • Ordinal: Gamma (related but not identical)
+3. Note: JASP does not directly compute weighted kappa.
+
+→ Use R (irr or psych package) for weighted kappa.
+   JASP can still visualise the cross-tabulation.`,
+
+    r: `library(irr)
+library(psych)
+
+# ── Data: two raters, ordinal categories ──
+# Ensure categories are ordered factors
+ratings$rater1 <- factor(ratings$rater1,
+  levels = c("none", "mild", "moderate", "severe"),
+  ordered = TRUE)
+ratings$rater2 <- factor(ratings$rater2,
+  levels = c("none", "mild", "moderate", "severe"),
+  ordered = TRUE)
+
+# ── Weighted kappa (quadratic weights) ──
+kappa2(ratings[, c("rater1", "rater2")], weight = "squared")
+# Returns: weighted kappa, z, p-value
+
+# ── Both weighted and unweighted (psych) ──
+tab <- table(ratings$rater1, ratings$rater2)
+cohen.kappa(tab)
+# Returns: unweighted kappa, weighted kappa, CIs
+
+# ── Cross-tabulation ──
+print(tab)`
+  },
+
+  icc: {
+    name: "Intraclass Correlation Coefficient (ICC)",
+    when: "Measuring agreement or consistency between two or more raters (or methods) for a continuous measurement. Used for inter-rater reliability, test-retest reliability, or comparing measurement instruments.",
+    assumptions: "Continuous outcome, normally distributed measurements, same set of subjects rated by all raters.",
+
+    sap: `The reliability of [measurement] across [raters/methods/time points] will be assessed using the Intraclass Correlation Coefficient (ICC). A two-way mixed-effects model with absolute agreement and single measures (ICC(3,1)) will be used for inter-rater reliability [or ICC(2,1) for random raters, or ICC(1,1) for test-retest with different raters]. The ICC with 95% confidence interval will be reported and interpreted as: < 0.50 poor, 0.50–0.75 moderate, 0.75–0.90 good, and > 0.90 excellent reliability (Koo & Li, 2016).`,
+    sapTraditional: `The reliability of [measurement] across [raters/methods/time points] will be assessed using the Intraclass Correlation Coefficient (ICC) with 95% confidence interval. ICC values will be interpreted as: < 0.50 poor, 0.50–0.75 moderate, 0.75–0.90 good, and > 0.90 excellent reliability. A p-value < 0.05 will be considered statistically significant.`,
+
+    example: `The ICC for tumour diameter measurement across three radiologists was 0.91 (95% CI: 0.86–0.95, F(79, 158) = 11.4, p < 0.001), indicating excellent inter-rater reliability. The mean difference between any two raters did not exceed 1.2 mm, which is within the clinically acceptable range of ± 2 mm.`,
+    exampleTraditional: `The Intraclass Correlation Coefficient for tumour diameter measurement across three radiologists was 0.91 (95% CI: 0.86–0.95, p < 0.001), indicating excellent inter-rater reliability.`,
+
+    report: "ICC value with 95% CI, F-statistic and p-value, ICC model used (one-way/two-way, random/mixed, single/average, consistency/agreement), Interpretation (Koo & Li scale)",
+
+    jasp: `Reliability → Intraclass Correlation
+
+1. Move all rater columns into "Variables"
+2. Select ICC type:
+   • Two-way mixed, absolute agreement → ICC(3,1)
+     (most common for reliability studies)
+   • Two-way random, absolute agreement → ICC(2,1)
+     (raters are a random sample from population)
+3. Check: 95% Confidence Interval
+4. Output: ICC, CI, F-test`,
+
+    r: `library(irr)
+library(psych)
+
+# ── Data format: rows = subjects, columns = raters ──
+# Each cell = measurement by that rater for that subject
+ratings_matrix <- df[, c("rater1", "rater2", "rater3")]
+
+# ── ICC using irr package ──
+icc(ratings_matrix,
+    model = "twoway",    # "oneway" or "twoway"
+    type = "agreement",  # "agreement" or "consistency"
+    unit = "single")     # "single" or "average"
+# Returns: ICC, F-test, p-value, CI
+
+# ── ICC using psych package (all forms at once) ──
+ICC(ratings_matrix)
+# Returns: ICC1, ICC2, ICC3, ICC1k, ICC2k, ICC3k
+# with F-tests and confidence intervals
+
+# ── Quick guide to ICC selection ──
+# ICC(1,1) = one-way random, single rater
+# ICC(2,1) = two-way random, absolute agreement, single
+# ICC(3,1) = two-way mixed, absolute agreement, single
+# ICC(2,k) = two-way random, absolute agreement, average
+# ICC(3,k) = two-way mixed, consistency, average`
+  },
+
+  bland_altman: {
+    name: "Bland-Altman Analysis (Method Comparison)",
+    when: "Comparing two measurement methods or instruments that measure the same continuous quantity (e.g., comparing a new BP device with a standard mercury sphygmomanometer). Determines whether two methods agree well enough to be used interchangeably.",
+    assumptions: "Two methods measuring the same quantity on the same subjects, continuous measurements, differences approximately normally distributed.",
+
+    sap: `Agreement between [method A] and [method B] for measuring [outcome] will be assessed using Bland-Altman analysis. The mean difference (bias) between methods with 95% limits of agreement (mean difference ± 1.96 × SD of differences) will be calculated. A Bland-Altman plot will display the differences against the average of the two methods, with horizontal lines for bias and limits of agreement. Proportional bias will be assessed by regressing the difference on the mean. Clinical acceptability of agreement will be judged against a predefined tolerance of [± X units].`,
+    sapTraditional: `Agreement between [method A] and [method B] for measuring [outcome] will be assessed using Bland-Altman analysis. The mean difference (bias) with 95% limits of agreement (LoA) will be calculated. A Bland-Altman plot will be constructed. Agreement will be considered acceptable if the 95% LoA fall within the a priori defined clinically acceptable range of [± X units].`,
+
+    example: `Bland-Altman analysis comparing the automated device with mercury sphygmomanometer for systolic BP showed a mean bias of −2.1 mmHg (95% CI: −3.4 to −0.8), indicating the automated device reads slightly lower on average. The 95% limits of agreement were −14.3 to 10.1 mmHg. The Bland-Altman plot showed no evidence of proportional bias (slope = 0.02, p = 0.74). Given the predefined clinical tolerance of ± 10 mmHg, the limits of agreement slightly exceed this threshold, suggesting the two methods are not fully interchangeable for individual patients, though the systematic bias is small.`,
+    exampleTraditional: `The mean difference (bias) between the automated device and mercury sphygmomanometer was −2.1 mmHg (SD = 6.2). The 95% limits of agreement were −14.3 to 10.1 mmHg. The Bland-Altman plot showed no significant proportional bias.`,
+
+    report: "Mean difference (bias) with 95% CI, SD of differences, 95% Limits of Agreement, Bland-Altman plot, Assessment of proportional bias (regression), Comparison with predefined clinical tolerance",
+
+    jasp: `JASP does not have a built-in Bland-Altman module.
+
+→ Use R for Bland-Altman analysis (BlandAltmanLeh or
+  blandr package).
+
+Workaround in JASP:
+1. Compute new variable: difference = method1 − method2
+2. Compute new variable: average = (method1 + method2) / 2
+3. Descriptives → get mean and SD of difference
+4. Scatter plot: average (x) vs difference (y)
+   Then manually add reference lines for bias and LoA.`,
+
+    r: `library(BlandAltmanLeh)
+library(ggplot2)
+
+# ── Basic Bland-Altman ──
+ba <- bland.altman.stats(df$method1, df$method2,
+                          conf.int = 0.95)
+print(ba)
+# Returns: mean.diffs (bias), lower.limit, upper.limit,
+#          sd.diffs, lines (for plotting)
+
+# ── Bland-Altman plot (publication quality) ──
+ba_plot <- bland.altman.plot(df$method1, df$method2,
+  main = "Bland-Altman Plot",
+  xlab = "Mean of Two Methods",
+  ylab = "Difference (Method 1 − Method 2)",
+  conf.int = 0.95)
+
+# ── Manual approach (more control) ──
+df$diff <- df$method1 - df$method2
+df$avg  <- (df$method1 + df$method2) / 2
+
+bias <- mean(df$diff)
+sd_diff <- sd(df$diff)
+upper_loa <- bias + 1.96 * sd_diff
+lower_loa <- bias - 1.96 * sd_diff
+
+ggplot(df, aes(x = avg, y = diff)) +
+  geom_point(alpha = 0.6) +
+  geom_hline(yintercept = bias, colour = "blue") +
+  geom_hline(yintercept = c(upper_loa, lower_loa),
+             colour = "red", linetype = "dashed") +
+  annotate("text", x = Inf, y = bias,
+           label = paste0("Bias = ", round(bias, 2)),
+           hjust = 1.1, colour = "blue") +
+  annotate("text", x = Inf, y = upper_loa,
+           label = paste0("+1.96 SD = ", round(upper_loa, 2)),
+           hjust = 1.1, colour = "red") +
+  annotate("text", x = Inf, y = lower_loa,
+           label = paste0("-1.96 SD = ", round(lower_loa, 2)),
+           hjust = 1.1, colour = "red") +
+  theme_minimal() +
+  labs(title = "Bland-Altman Plot",
+       x = "Mean of Two Methods",
+       y = "Difference (Method 1 − Method 2)")
+
+# ── Test for proportional bias ──
+summary(lm(diff ~ avg, data = df))`
+  }
+};
+
+export const AGREEMENT_STEPS = [
+  {
+    id: "agree_type",
+    title: "What type of measurement are you comparing?",
+    subtitle: "The kind of data your raters or methods produce",
+    options: [
+      { value: "nominal", label: "Categorical (unordered)", desc: "Diagnoses, classifications, binary results (yes/no)", icon: "🏷️" },
+      { value: "ordinal", label: "Ordinal (ordered categories)", desc: "Severity grades, Likert scales, staging", icon: "📊" },
+      { value: "continuous", label: "Continuous measurement", desc: "BP, lab values, tumour size, scores", icon: "📏" },
+    ],
+  },
+  {
+    id: "agree_purpose",
+    title: "What is the purpose of the comparison?",
+    subtitle: "This determines which agreement statistic is most appropriate",
+    show: (a) => a.agree_type === "continuous",
+    options: [
+      { value: "reliability", label: "Rater / Test-Retest Reliability", desc: "Do raters (or repeated measurements) give consistent results?", icon: "👥" },
+      { value: "method_comparison", label: "Method Comparison", desc: "Can a new measurement method replace the standard one?", icon: "🔄" },
+      { value: "both", label: "Both reliability and method comparison", desc: "Assess ICC for reliability AND Bland-Altman for interchangeability", icon: "📋" },
+    ],
+  },
+];
+
+export function recommendAgreement(answers) {
+  const { agree_type, agree_purpose } = answers;
+  if (agree_type === "nominal") return ["cohen_kappa"];
+  if (agree_type === "ordinal") return ["weighted_kappa"];
+  if (agree_type === "continuous") {
+    if (agree_purpose === "reliability") return ["icc"];
+    if (agree_purpose === "method_comparison") return ["bland_altman"];
+    if (agree_purpose === "both") return ["icc", "bland_altman"];
+  }
+  return [];
+}
+
+export function explainAgreementReasoning(answers) {
+  const { agree_type, agree_purpose } = answers;
+  if (agree_type === "nominal") {
+    return "Your data is **categorical (unordered)**, so **Cohen's kappa** is the appropriate measure of inter-rater agreement. It corrects for agreement that would occur by chance alone.";
+  }
+  if (agree_type === "ordinal") {
+    return "Your data is **ordinal (ordered categories)**, so **weighted kappa** is appropriate. It gives partial credit for near-misses (e.g., classifying as 'moderate' when the other rater said 'mild' is penalised less than 'severe' vs. 'mild').";
+  }
+  if (agree_type === "continuous") {
+    if (agree_purpose === "reliability") return "You want to assess **reliability** of continuous measurements across raters. The **Intraclass Correlation Coefficient (ICC)** quantifies how much of the total variance is due to true differences between subjects vs. rater disagreement.";
+    if (agree_purpose === "method_comparison") return "You want to determine if two **measurement methods are interchangeable**. **Bland-Altman analysis** is the standard approach — it shows the bias (systematic difference) and the 95% limits of agreement (range within which most differences fall).";
+    if (agree_purpose === "both") return "You need both **reliability (ICC)** and **method interchangeability (Bland-Altman)**. ICC tells you how consistent the measurements are; Bland-Altman tells you whether the two methods agree well enough to be used interchangeably in clinical practice.";
+  }
+  return "";
+}
+
 // ─── Glossary of Key Terms ───
 
 export const GLOSSARY = {
@@ -1180,4 +1620,14 @@ export const GLOSSARY = {
   "AUC": "Area Under the ROC Curve. Measures how well a model discriminates between positive and negative cases. AUC = 0.5 means no discrimination (coin flip); AUC = 1.0 means perfect discrimination. Generally: 0.7\u20130.8 acceptable, 0.8\u20130.9 good, >0.9 excellent.",
   "IQR": "Interquartile Range \u2014 the range between the 25th percentile (Q1) and 75th percentile (Q3). Contains the middle 50% of the data. Used to summarise skewed distributions alongside the median.",
   "MCID": "Minimum Clinically Important Difference \u2014 the smallest change in an outcome that patients or clinicians would consider meaningful. Used to interpret whether a statistically significant effect is also clinically relevant.",
+  "sensitivity": "The proportion of true positives correctly identified by a test. Sensitivity = TP / (TP + FN). A highly sensitive test rarely misses disease (few false negatives). Also called the true positive rate.",
+  "specificity": "The proportion of true negatives correctly identified by a test. Specificity = TN / (TN + FP). A highly specific test rarely gives false alarms (few false positives). Also called the true negative rate.",
+  "PPV": "Positive Predictive Value \u2014 the probability that a person with a positive test result actually has the disease. PPV = TP / (TP + FP). Depends on disease prevalence.",
+  "NPV": "Negative Predictive Value \u2014 the probability that a person with a negative test result truly does not have the disease. NPV = TN / (TN + FN). Depends on disease prevalence.",
+  "likelihood ratio": "How much a test result changes the probability of disease. LR+ = sensitivity / (1 \u2212 specificity); LR\u2212 = (1 \u2212 sensitivity) / specificity. LR+ > 10 or LR\u2212 < 0.1 are strong; LR+ 5\u201310 or LR\u2212 0.1\u20130.2 are moderate.",
+  "ROC curve": "Receiver Operating Characteristic curve \u2014 plots sensitivity (y-axis) against 1\u2212specificity (x-axis) at all possible cutoff points. The closer the curve to the top-left corner, the better the discrimination.",
+  "Youden's index": "J = Sensitivity + Specificity \u2212 1. The cutoff that maximises Youden\u2019s index is the 'optimal' cutoff balancing sensitivity and specificity. Ranges from 0 (useless test) to 1 (perfect test).",
+  "kappa": "Cohen's kappa (\u03ba) measures inter-rater agreement correcting for chance. \u03ba = 0 means agreement no better than chance; \u03ba = 1 means perfect agreement. Landis & Koch scale: <0.20 poor, 0.21\u20130.40 fair, 0.41\u20130.60 moderate, 0.61\u20130.80 substantial, 0.81\u20131.00 almost perfect.",
+  "ICC": "Intraclass Correlation Coefficient \u2014 measures reliability/agreement for continuous data among multiple raters. Accounts for both systematic and random differences. Koo & Li scale: <0.50 poor, 0.50\u20130.75 moderate, 0.75\u20130.90 good, >0.90 excellent.",
+  "Bland-Altman": "A method for assessing agreement between two measurement methods. Plots the difference between methods against their mean. Shows systematic bias (mean difference) and 95% limits of agreement (mean \u00b1 1.96\u00d7SD). If limits fall within clinical tolerance, methods are interchangeable.",
 };
