@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive, GLOSSARY, DIAGNOSTIC_TESTS, DIAGNOSTIC_STEPS, recommendDiagnostic, explainDiagnosticReasoning, AGREEMENT_TESTS, AGREEMENT_STEPS, recommendAgreement, explainAgreementReasoning } from "./statTestsData";
+import { SS_STEPS, resolveCalculator, CALCULATORS, generateSensitivityTable } from "./sampleSizeData";
 import { Analytics } from "@vercel/analytics/react";
 
 function CopyButton({ text }) {
@@ -512,6 +513,285 @@ function DarkToggle({ dark, setDark }) {
   );
 }
 
+// ─── Sample Size Calculator Component ───
+
+function SampleSizeCalculator({ calcId, dark }) {
+  const calc = CALCULATORS[calcId];
+  const [params, setParams] = useState(() => {
+    const defaults = {};
+    calc.parameters.forEach((p) => {
+      if (p.default !== undefined) defaults[p.id] = p.default;
+    });
+    return defaults;
+  });
+  const [tab, setTab] = useState("result");
+  const [computed, setComputed] = useState(null);
+
+  if (!calc) return null;
+
+  const setParam = (id, value) => {
+    setParams((prev) => ({ ...prev, [id]: value }));
+    setComputed(null);
+  };
+
+  const handleCompute = () => {
+    const result = calc.compute(params);
+    setComputed(result);
+  };
+
+  const allFilled = calc.parameters.filter((p) => !p.show || p.show(params)).every((p) => {
+    const v = params[p.id];
+    return v !== undefined && v !== "" && v !== null;
+  });
+
+  const tabs = [
+    { id: "result", label: "Result" },
+    { id: "r", label: "R Code" },
+    { id: "gpower", label: "G*Power" },
+    { id: "sap", label: "SAP Text" },
+  ];
+
+  const sensitivity = computed ? generateSensitivityTable(calcId, params) : null;
+
+  const cardBg = dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-100";
+
+  return (
+    <div className={`rounded-2xl border shadow-lg overflow-hidden mb-4 ${cardBg}`}>
+      {/* Header */}
+      <div className="bg-emerald-600 px-5 py-3">
+        <h3 className="text-white font-bold text-lg">{calc.name}</h3>
+        <p className="text-emerald-100 text-xs mt-0.5">Sample size calculator</p>
+      </div>
+
+      {/* Parameter inputs */}
+      <div className={`px-5 py-4 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>
+        <p className={`text-xs font-bold uppercase tracking-wide mb-3 ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+          Input Parameters
+        </p>
+        <div className="space-y-4">
+          {calc.parameters
+            .filter((p) => !p.show || p.show(params))
+            .map((p) => (
+              <div key={p.id}>
+                <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                  {p.label}
+                </label>
+                {p.type === "number" && (
+                  <input
+                    type="number"
+                    step={p.step || 1}
+                    value={params[p.id] ?? ""}
+                    placeholder={p.placeholder || ""}
+                    onChange={(e) => setParam(p.id, e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors ${
+                      dark
+                        ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-emerald-500"
+                        : "bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:border-emerald-500"
+                    } focus:outline-none focus:ring-1 focus:ring-emerald-500`}
+                  />
+                )}
+                {p.type === "select" && (
+                  <select
+                    value={params[p.id] ?? p.default}
+                    onChange={(e) => setParam(p.id, e.target.value)}
+                    className={`w-full px-3 py-2 rounded-lg border text-sm ${
+                      dark
+                        ? "bg-gray-800 border-gray-600 text-gray-200"
+                        : "bg-white border-gray-300 text-gray-800"
+                    } focus:outline-none focus:ring-1 focus:ring-emerald-500`}
+                  >
+                    {p.options.map((o) => (
+                      <option key={o.value} value={o.value}>{o.label}</option>
+                    ))}
+                  </select>
+                )}
+                {p.type === "radio" && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {p.options.map((o) => (
+                      <button
+                        key={o.value}
+                        onClick={() => setParam(p.id, o.value)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          String(params[p.id]) === String(o.value)
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : dark
+                              ? "bg-gray-800 text-gray-300 border-gray-600 hover:border-emerald-500"
+                              : "bg-white text-gray-600 border-gray-300 hover:border-emerald-400"
+                        }`}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+        </div>
+
+        {/* Compute button */}
+        <button
+          onClick={handleCompute}
+          disabled={!allFilled}
+          className={`w-full mt-5 py-3 rounded-xl font-bold text-sm transition-all ${
+            allFilled
+              ? "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg"
+              : dark
+                ? "bg-gray-700 text-gray-500 cursor-not-allowed"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          }`}
+        >
+          {allFilled ? "Calculate Sample Size" : "Fill all parameters above"}
+        </button>
+      </div>
+
+      {/* Results area */}
+      {computed && (
+        <>
+          {/* Tab bar */}
+          <div className={`flex border-b ${dark ? "border-gray-700" : "border-gray-200"} overflow-x-auto`} style={{ scrollbarWidth: "none" }}>
+            {tabs.map((tb) => (
+              <button
+                key={tb.id}
+                onClick={() => setTab(tb.id)}
+                className={`flex-1 min-w-0 py-3 text-xs sm:text-sm font-medium transition-colors whitespace-nowrap px-3 ${
+                  tab === tb.id
+                    ? "text-emerald-600 border-b-2 border-emerald-600 " + (dark ? "bg-emerald-950" : "bg-emerald-50")
+                    : (dark ? "text-gray-400 hover:text-gray-200" : "text-gray-500 hover:text-gray-700")
+                }`}
+              >
+                {tb.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div className="p-5">
+            {tab === "result" && (
+              <div>
+                {/* Main result */}
+                <div className={`rounded-xl p-5 mb-4 ${dark ? "bg-emerald-950 border border-emerald-800" : "bg-emerald-50 border border-emerald-200"}`}>
+                  <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                    Required Sample Size
+                  </p>
+                  <p className={`text-3xl font-bold mb-1 ${dark ? "text-emerald-300" : "text-emerald-700"}`}>
+                    n = {computed.total}
+                  </p>
+                  <p className={`text-sm font-medium ${dark ? "text-emerald-200" : "text-emerald-800"}`}>
+                    {computed.label}
+                  </p>
+                </div>
+
+                {/* Formula breakdown */}
+                <div className={`rounded-lg p-4 mb-4 ${dark ? "bg-gray-800" : "bg-gray-50"}`}>
+                  <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${dark ? "text-gray-400" : "text-gray-500"}`}>
+                    Calculation Details
+                  </p>
+                  <pre className={`text-xs leading-relaxed whitespace-pre-wrap font-mono ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                    {computed.formula}
+                  </pre>
+                </div>
+
+                {/* Practical tip */}
+                <div className={`rounded-lg px-4 py-3 ${dark ? "bg-amber-950 border border-amber-800" : "bg-amber-50 border border-amber-200"}`}>
+                  <p className={`text-xs ${dark ? "text-amber-200" : "text-amber-800"}`}>
+                    <strong>Practical tip:</strong> Add 10–20% to account for expected dropouts, non-response, or missing data. Final enrollment target: <strong>{Math.ceil(computed.total * 1.1)}–{Math.ceil(computed.total * 1.2)}</strong> subjects.
+                  </p>
+                </div>
+
+                {/* Sensitivity table */}
+                {sensitivity && (
+                  <div className="mt-4">
+                    <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${dark ? "text-gray-400" : "text-gray-500"}`}>
+                      Sensitivity Analysis — Total n by effect size × power
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className={`w-full text-xs border-collapse ${dark ? "text-gray-300" : "text-gray-700"}`}>
+                        <thead>
+                          <tr>
+                            <th className={`text-left py-2 px-3 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>Effect</th>
+                            {sensitivity.headers.map((h) => (
+                              <th key={h} className={`text-center py-2 px-3 border-b ${dark ? "border-gray-700" : "border-gray-200"}`}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sensitivity.rows.map((row, i) => (
+                            <tr key={i} className={row.highlight ? (dark ? "bg-emerald-950" : "bg-emerald-50") : ""}>
+                              <td className={`py-2 px-3 font-medium ${row.highlight ? (dark ? "text-emerald-300" : "text-emerald-700") : ""}`}>{row.label}</td>
+                              {row.cols.map((c, j) => (
+                                <td key={j} className={`text-center py-2 px-3 ${row.highlight && sensitivity.headers[j] === `${Number(params.power)*100}%` ? "font-bold" : ""}`}>{c}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <p className={`text-xs mt-2 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                      Highlighted row = your specified effect size. Bold cell = your exact scenario.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab === "r" && (
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${dark ? "text-blue-400" : "text-blue-600"}`}>
+                  R Code — validate with pwr / epiR package
+                </p>
+                <div className="relative">
+                  <CopyButton text={calc.rCode(params)} />
+                  <div className="bg-gray-900 rounded-lg p-4 pr-20 text-sm text-green-300 leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto">
+                    {calc.rCode(params)}
+                  </div>
+                </div>
+                <p className={`text-xs mt-3 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                  Run in R to cross-validate the browser computation. Key packages: pwr, epiR, powerSurvEpi, kappaSize.
+                </p>
+              </div>
+            )}
+
+            {tab === "gpower" && (
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${dark ? "text-purple-400" : "text-purple-600"}`}>
+                  G*Power Desktop Software — step-by-step
+                </p>
+                <div className="relative">
+                  <CopyButton text={calc.gpower(params)} />
+                  <div className={`rounded-lg p-4 pr-20 text-sm leading-relaxed whitespace-pre-wrap font-mono ${
+                    dark ? "bg-purple-950 border border-purple-800 text-purple-200" : "bg-purple-50 border border-purple-200 text-purple-900"
+                  }`}>
+                    {calc.gpower(params)}
+                  </div>
+                </div>
+                <p className={`text-xs mt-3 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+                  G*Power is free: <span className={dark ? "text-purple-400" : "text-purple-600"}>gpower.hhu.de</span>
+                </p>
+              </div>
+            )}
+
+            {tab === "sap" && (
+              <div>
+                <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
+                  SAP Text — copy into your protocol
+                </p>
+                <div className="relative">
+                  <CopyButton text={calc.sap(params, computed)} />
+                  <div className={`rounded-lg p-4 pr-20 text-sm leading-relaxed whitespace-pre-line font-serif italic ${
+                    dark ? "bg-gray-800 border border-gray-600 text-gray-200" : "bg-gray-50 border border-gray-200 text-gray-700"
+                  }`}>
+                    {calc.sap(params, computed)}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main App ───
 
 export default function ChooseMyStat() {
@@ -561,7 +841,7 @@ export default function ChooseMyStat() {
     }
   }, [showResults, mode, answers]);
 
-  const activeSteps = mode === "descriptive" ? DESCRIPTIVE_STEPS : mode === "diagnostic" ? DIAGNOSTIC_STEPS : mode === "agreement" ? AGREEMENT_STEPS : STEPS;
+  const activeSteps = mode === "descriptive" ? DESCRIPTIVE_STEPS : mode === "diagnostic" ? DIAGNOSTIC_STEPS : mode === "agreement" ? AGREEMENT_STEPS : mode === "samplesize" ? SS_STEPS : STEPS;
   const visibleSteps = activeSteps.filter((s) => !s.show || s.show(answers));
   const currentStep = visibleSteps[stepIndex];
 
@@ -648,7 +928,7 @@ export default function ChooseMyStat() {
       const testData = item.resultKeys.map((k) => testLookup[k]);
       const inputStr = Object.entries(item.answers).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v.replace(/_/g, " ")}`).join(", ");
 
-      const modeLabels = { descriptive: "Descriptive Analysis", inferential: "Inferential Test", diagnostic: "Diagnostic Accuracy", agreement: "Agreement / Reliability" };
+      const modeLabels = { descriptive: "Descriptive Analysis", inferential: "Inferential Test", diagnostic: "Diagnostic Accuracy", agreement: "Agreement / Reliability", samplesize: "Sample Size Calculation" };
       lines.push(`OBJECTIVE ${num}`, "─".repeat(30));
       lines.push(`Type: ${modeLabels[item.mode] || item.mode}`);
       lines.push(`Inputs: ${inputStr}`);
@@ -681,7 +961,7 @@ export default function ChooseMyStat() {
   };
 
   const results = showResults
-    ? (mode === "descriptive" ? recommendDescriptive(answers) : mode === "diagnostic" ? recommendDiagnostic(answers) : mode === "agreement" ? recommendAgreement(answers) : recommend(answers))
+    ? (mode === "samplesize" ? [resolveCalculator(answers)] : mode === "descriptive" ? recommendDescriptive(answers) : mode === "diagnostic" ? recommendDiagnostic(answers) : mode === "agreement" ? recommendAgreement(answers) : recommend(answers))
     : [];
 
   // ─── Shared dark-mode class helpers ───
@@ -798,6 +1078,25 @@ export default function ChooseMyStat() {
                   </div>
                   <div className={`text-sm ${textSecondary} mt-1`}>
                     Cohen's kappa, weighted kappa, ICC, and Bland-Altman analysis for inter-rater and method comparison studies
+                  </div>
+                </div>
+              </div>
+            </button>
+
+            <button
+              onClick={() => setMode("samplesize")}
+              className={`w-full text-left rounded-2xl shadow-lg border-2 ${card} ${dark ? "hover:border-emerald-500" : "hover:border-emerald-400"} hover:shadow-xl transition-all p-6 group`}
+            >
+              <div className="flex items-start gap-4">
+                <div className="text-emerald-500 group-hover:text-emerald-400 transition-colors">
+                  <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v-2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /><path d="M19 8h2m-1-1v2" /></svg>
+                </div>
+                <div>
+                  <div className={`text-lg font-bold ${textPrimary} group-hover:text-emerald-500`}>
+                    Calculate Sample Size
+                  </div>
+                  <div className={`text-sm ${textSecondary} mt-1`}>
+                    In-browser power calculations with R code and G*Power instructions for t-tests, ANOVA, chi-square, regression, survival, diagnostic, and agreement studies
                   </div>
                 </div>
               </div>
@@ -1027,7 +1326,7 @@ export default function ChooseMyStat() {
   }
 
   // ─── Question / Results Flow (shared by both modes) ───
-  const accentColor = mode === "descriptive" ? "teal" : mode === "diagnostic" ? "rose" : mode === "agreement" ? "amber" : "indigo";
+  const accentColor = mode === "descriptive" ? "teal" : mode === "diagnostic" ? "rose" : mode === "agreement" ? "amber" : mode === "samplesize" ? "emerald" : "indigo";
 
   return (
     <div className={`min-h-screen ${bg} flex items-start justify-center p-4 pt-8 transition-colors duration-300`}>
@@ -1039,7 +1338,7 @@ export default function ChooseMyStat() {
             ChooseMyStat
           </button>
           <p className={`text-sm ${textSecondary} mt-1`}>
-            {mode === "descriptive" ? "Describe My Variables" : mode === "diagnostic" ? "Diagnostic Accuracy" : mode === "agreement" ? "Agreement / Reliability" : "Choose a Statistical Test"}
+            {mode === "descriptive" ? "Describe My Variables" : mode === "diagnostic" ? "Diagnostic Accuracy" : mode === "agreement" ? "Agreement / Reliability" : mode === "samplesize" ? "Sample Size Calculator" : "Choose a Statistical Test"}
           </p>
           {planItems.length > 0 && (
             <button
@@ -1099,7 +1398,7 @@ export default function ChooseMyStat() {
             {/* Results header */}
             <div className={`rounded-2xl shadow-lg border p-5 mb-5 ${card}`}>
               <h2 className={`text-lg font-bold ${textPrimary} mb-1`}>
-                {mode === "descriptive" ? "Recommended Summary" : mode === "diagnostic" ? "Recommended Diagnostic Method" : mode === "agreement" ? "Recommended Agreement Statistic" : "Recommended Analysis"}
+                {mode === "descriptive" ? "Recommended Summary" : mode === "diagnostic" ? "Recommended Diagnostic Method" : mode === "agreement" ? "Recommended Agreement Statistic" : mode === "samplesize" ? "Sample Size Calculator" : "Recommended Analysis"}
               </h2>
               <p className={`text-sm ${textSecondary} mb-1`}>Based on your inputs:</p>
               <div className="flex flex-wrap gap-2 mb-4">
@@ -1124,7 +1423,7 @@ export default function ChooseMyStat() {
                 Share this recommendation
               </button>
 
-              {/* Why this test? */}
+              {/* Why this test? (not for sample size or descriptive) */}
               {(mode === "inferential" || mode === "diagnostic" || mode === "agreement") && (
                 <div className={`rounded-lg px-4 py-3 mb-3 ${dark ? "bg-indigo-950 border border-indigo-800" : "bg-indigo-50 border border-indigo-100"}`}>
                   <p className={`text-xs font-semibold uppercase tracking-wide mb-1 ${dark ? "text-indigo-400" : "text-indigo-600"}`}>
@@ -1142,7 +1441,8 @@ export default function ChooseMyStat() {
                 </p>
               )}
 
-              {/* Reporting style toggle */}
+              {/* Reporting style toggle — not for sample size mode */}
+              {mode !== "samplesize" && (<>
               <div className={`flex items-center justify-between rounded-lg px-3 py-2 ${dark ? "bg-gray-800" : "bg-gray-50"}`}>
                 <span className={`text-xs font-medium ${dark ? "text-gray-300" : "text-gray-600"}`}>Reporting style:</span>
                 <div className={`flex items-center rounded-lg border overflow-hidden ${dark ? "bg-gray-900 border-gray-600" : "bg-white border-gray-200"}`}>
@@ -1170,10 +1470,13 @@ export default function ChooseMyStat() {
                   The ASA's 2016 statement discourages rigid reliance on p &lt; 0.05 as a bright-line threshold. Traditional templates are shown for reference, as many journals and IECs still expect this style.
                 </p>
               )}
+              </>)}
             </div>
 
             {/* Result cards */}
-            {mode === "descriptive"
+            {mode === "samplesize"
+              ? results.filter(Boolean).map((calcId) => <SampleSizeCalculator key={calcId} calcId={calcId} dark={dark} />)
+              : mode === "descriptive"
               ? results.map((key) => <DescriptiveResult key={key} descKey={key} useTraditional={useTraditional} />)
               : mode === "diagnostic"
               ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={DIAGNOSTIC_TESTS} />)
