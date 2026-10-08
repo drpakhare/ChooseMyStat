@@ -1286,6 +1286,14 @@ Reference:
   },
 };
 
+// ━━━ REVERSE LOOKUP: test key → calculator key ━━━━━━━━━━━
+export function getCalcForTest(testKey) {
+  for (const [calcId, calc] of Object.entries(CALCULATORS)) {
+    if (calc.linkedTests.includes(testKey)) return calcId;
+  }
+  return null;
+}
+
 // ━━━ SENSITIVITY TABLE GENERATOR ━━━━━━━━━━━━━━━━━━━━━━━━
 
 export function generateSensitivityTable(calcId, params) {

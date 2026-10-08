@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { TESTS, STEPS, recommend, DESCRIPTIVES, DESCRIPTIVE_STEPS, explainReasoning, recommendDescriptive, GLOSSARY, DIAGNOSTIC_TESTS, DIAGNOSTIC_STEPS, recommendDiagnostic, explainDiagnosticReasoning, AGREEMENT_TESTS, AGREEMENT_STEPS, recommendAgreement, explainAgreementReasoning } from "./statTestsData";
-import { SS_STEPS, resolveCalculator, CALCULATORS, generateSensitivityTable } from "./sampleSizeData";
+import { SS_STEPS, resolveCalculator, CALCULATORS, generateSensitivityTable, getCalcForTest } from "./sampleSizeData";
 import { Analytics } from "@vercel/analytics/react";
 
 function CopyButton({ text }) {
@@ -226,10 +226,11 @@ function ProgressDots({ total, current }) {
 
 // ─── Test Result Card with Tabs ───
 
-function TestResult({ testKey, useTraditional, testSource }) {
+function TestResult({ testKey, useTraditional, testSource, onCalcSampleSize }) {
   const t = (testSource || TESTS)[testKey];
   const [tab, setTab] = useState("sap");
   if (!t) return null;
+  const linkedCalcId = getCalcForTest(testKey);
 
   const tabs = [
     { id: "sap", label: "SAP Template" },
@@ -349,6 +350,21 @@ function TestResult({ testKey, useTraditional, testSource }) {
           </div>
         )}
       </div>
+
+      {/* Cross-link to sample size calculator */}
+      {linkedCalcId && onCalcSampleSize && (
+        <div className="px-5 py-3 border-t border-gray-100 dark:border-gray-700" style={{ background: "var(--card-bg, white)" }}>
+          <button
+            onClick={() => onCalcSampleSize(linkedCalcId)}
+            className="w-full flex items-center justify-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-colors bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:border-emerald-800 dark:hover:bg-emerald-900"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v-2" /><circle cx="9" cy="7" r="4" /><path d="M19 8h2m-1-1v2" />
+            </svg>
+            Calculate Sample Size for {t.name} →
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -526,6 +542,7 @@ function SampleSizeCalculator({ calcId, dark }) {
   });
   const [tab, setTab] = useState("result");
   const [computed, setComputed] = useState(null);
+  const [dropoutPct, setDropoutPct] = useState(0);
 
   if (!calc) return null;
 
@@ -538,6 +555,14 @@ function SampleSizeCalculator({ calcId, dark }) {
     const result = calc.compute(params);
     setComputed(result);
   };
+
+  // Dropout-adjusted values
+  const dropRate = Number(dropoutPct) || 0;
+  const hasDropout = dropRate > 0 && dropRate < 100;
+  const adjustedTotal = computed && hasDropout ? Math.ceil(computed.total / (1 - dropRate / 100)) : null;
+  const adjustedN1 = computed && computed.n1 && hasDropout ? Math.ceil(computed.n1 / (1 - dropRate / 100)) : null;
+  const adjustedN2 = computed && computed.n2 && hasDropout ? Math.ceil(computed.n2 / (1 - dropRate / 100)) : null;
+  const adjustedN = computed && computed.n && hasDropout ? Math.ceil(computed.n / (1 - dropRate / 100)) : null;
 
   const allFilled = calc.parameters.filter((p) => !p.show || p.show(params)).every((p) => {
     const v = params[p.id];
@@ -628,6 +653,35 @@ function SampleSizeCalculator({ calcId, dark }) {
             ))}
         </div>
 
+        {/* Dropout / non-response adjustment */}
+        <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${dark ? "#374151" : "#e5e7eb"}` }}>
+          <label className={`block text-sm font-medium mb-1 ${dark ? "text-gray-300" : "text-gray-700"}`}>
+            Expected dropout / non-response (%)
+          </label>
+          <div className="flex items-center gap-3">
+            <input
+              type="number"
+              min="0"
+              max="90"
+              step="5"
+              value={dropoutPct || ""}
+              placeholder="e.g. 10, 15, 20"
+              onChange={(e) => { setDropoutPct(e.target.value); setComputed(null); }}
+              className={`w-full px-3 py-2 rounded-lg border text-sm transition-colors ${
+                dark
+                  ? "bg-gray-800 border-gray-600 text-gray-200 placeholder-gray-500 focus:border-amber-500"
+                  : "bg-white border-gray-300 text-gray-800 placeholder-gray-400 focus:border-amber-500"
+              } focus:outline-none focus:ring-1 focus:ring-amber-500`}
+            />
+            <span className={`text-xs whitespace-nowrap ${dark ? "text-gray-500" : "text-gray-400"}`}>
+              0 = no adjustment
+            </span>
+          </div>
+          <p className={`text-xs mt-1.5 ${dark ? "text-gray-500" : "text-gray-400"}`}>
+            Inflates sample size to compensate for anticipated losses: n<sub>adjusted</sub> = n / (1 − dropout rate)
+          </p>
+        </div>
+
         {/* Compute button */}
         <button
           onClick={handleCompute}
@@ -671,7 +725,7 @@ function SampleSizeCalculator({ calcId, dark }) {
                 {/* Main result */}
                 <div className={`rounded-xl p-5 mb-4 ${dark ? "bg-emerald-950 border border-emerald-800" : "bg-emerald-50 border border-emerald-200"}`}>
                   <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${dark ? "text-emerald-400" : "text-emerald-600"}`}>
-                    Required Sample Size
+                    {hasDropout ? "Analytical Sample Size" : "Required Sample Size"}
                   </p>
                   <p className={`text-3xl font-bold mb-1 ${dark ? "text-emerald-300" : "text-emerald-700"}`}>
                     n = {computed.total}
@@ -680,6 +734,26 @@ function SampleSizeCalculator({ calcId, dark }) {
                     {computed.label}
                   </p>
                 </div>
+
+                {/* Dropout-adjusted result */}
+                {hasDropout && (
+                  <div className={`rounded-xl p-5 mb-4 ${dark ? "bg-amber-950 border border-amber-800" : "bg-amber-50 border border-amber-200"}`}>
+                    <p className={`text-xs font-bold uppercase tracking-wide mb-2 ${dark ? "text-amber-400" : "text-amber-600"}`}>
+                      Recruitment Target (adjusted for {dropRate}% dropout)
+                    </p>
+                    <p className={`text-3xl font-bold mb-1 ${dark ? "text-amber-300" : "text-amber-700"}`}>
+                      N = {adjustedTotal}
+                    </p>
+                    <p className={`text-sm font-medium ${dark ? "text-amber-200" : "text-amber-800"}`}>
+                      {adjustedN1 && adjustedN2
+                        ? `Group 1: ${adjustedN1}, Group 2: ${adjustedN2} (${adjustedTotal} total)`
+                        : `${adjustedTotal} subjects to enroll`}
+                    </p>
+                    <p className={`text-xs mt-2 ${dark ? "text-amber-400" : "text-amber-700"}`}>
+                      n<sub>adjusted</sub> = ⌈{computed.total} / (1 − {(dropRate/100).toFixed(2)})⌉ = ⌈{(computed.total / (1 - dropRate/100)).toFixed(1)}⌉ = {adjustedTotal}
+                    </p>
+                  </div>
+                )}
 
                 {/* Formula breakdown */}
                 <div className={`rounded-lg p-4 mb-4 ${dark ? "bg-gray-800" : "bg-gray-50"}`}>
@@ -691,12 +765,13 @@ function SampleSizeCalculator({ calcId, dark }) {
                   </pre>
                 </div>
 
-                {/* Practical tip */}
-                <div className={`rounded-lg px-4 py-3 ${dark ? "bg-amber-950 border border-amber-800" : "bg-amber-50 border border-amber-200"}`}>
-                  <p className={`text-xs ${dark ? "text-amber-200" : "text-amber-800"}`}>
-                    <strong>Practical tip:</strong> Add 10–20% to account for expected dropouts, non-response, or missing data. Final enrollment target: <strong>{Math.ceil(computed.total * 1.1)}–{Math.ceil(computed.total * 1.2)}</strong> subjects.
-                  </p>
-                </div>
+                {!hasDropout && (
+                  <div className={`rounded-lg px-4 py-3 ${dark ? "bg-amber-950 border border-amber-800" : "bg-amber-50 border border-amber-200"}`}>
+                    <p className={`text-xs ${dark ? "text-amber-200" : "text-amber-800"}`}>
+                      <strong>Tip:</strong> Use the "Expected dropout / non-response" field above to automatically inflate for anticipated losses.
+                    </p>
+                  </div>
+                )}
 
                 {/* Sensitivity table */}
                 {sensitivity && (
@@ -740,9 +815,12 @@ function SampleSizeCalculator({ calcId, dark }) {
                   R Code — validate with pwr / epiR package
                 </p>
                 <div className="relative">
-                  <CopyButton text={calc.rCode(params)} />
+                  <CopyButton text={calc.rCode(params) + (hasDropout ? `\n\n# ── Dropout / non-response adjustment ──\ndropout_rate <- ${(dropRate/100).toFixed(2)}\nn_analytical <- ${computed.total}\nn_adjusted <- ceiling(n_analytical / (1 - dropout_rate))\ncat("Analytical n:", n_analytical, "\\nRecruitment target (${dropRate}% dropout):", n_adjusted, "\\n")` : "")} />
                   <div className="bg-gray-900 rounded-lg p-4 pr-20 text-sm text-green-300 leading-relaxed whitespace-pre-wrap font-mono overflow-x-auto">
                     {calc.rCode(params)}
+                    {hasDropout && (
+                      <span className="text-yellow-300">{`\n\n# ── Dropout / non-response adjustment ──\ndropout_rate <- ${(dropRate/100).toFixed(2)}\nn_analytical <- ${computed.total}\nn_adjusted <- ceiling(n_analytical / (1 - dropout_rate))\ncat("Analytical n:", n_analytical, "\\nRecruitment target (${dropRate}% dropout):", n_adjusted, "\\n")`}</span>
+                    )}
                   </div>
                 </div>
                 <p className={`text-xs mt-3 ${dark ? "text-gray-500" : "text-gray-400"}`}>
@@ -767,6 +845,11 @@ function SampleSizeCalculator({ calcId, dark }) {
                 <p className={`text-xs mt-3 ${dark ? "text-gray-500" : "text-gray-400"}`}>
                   G*Power is free: <span className={dark ? "text-purple-400" : "text-purple-600"}>gpower.hhu.de</span>
                 </p>
+                {hasDropout && (
+                  <p className={`text-xs mt-2 ${dark ? "text-amber-400" : "text-amber-700"}`}>
+                    <strong>Note:</strong> G*Power computes analytical n only. Apply your {dropRate}% dropout adjustment manually: n_adjusted = ⌈n / (1 − {(dropRate/100).toFixed(2)})⌉ = {adjustedTotal}.
+                  </p>
+                )}
               </div>
             )}
 
@@ -776,11 +859,14 @@ function SampleSizeCalculator({ calcId, dark }) {
                   SAP Text — copy into your protocol
                 </p>
                 <div className="relative">
-                  <CopyButton text={calc.sap(params, computed)} />
+                  <CopyButton text={calc.sap(params, computed) + (hasDropout ? ` Accounting for an anticipated ${dropRate}% dropout/non-response rate, the enrollment target is inflated to ${adjustedTotal} subjects (n_adjusted = ⌈${computed.total} / (1 − ${(dropRate/100).toFixed(2)})⌉ = ${adjustedTotal}).` : "")} />
                   <div className={`rounded-lg p-4 pr-20 text-sm leading-relaxed whitespace-pre-line font-serif italic ${
                     dark ? "bg-gray-800 border border-gray-600 text-gray-200" : "bg-gray-50 border border-gray-200 text-gray-700"
                   }`}>
                     {calc.sap(params, computed)}
+                    {hasDropout && (
+                      <span className="font-semibold not-italic"> Accounting for an anticipated {dropRate}% dropout/non-response rate, the enrollment target is inflated to {adjustedTotal} subjects (n<sub>adjusted</sub> = ⌈{computed.total} / (1 − {(dropRate/100).toFixed(2)})⌉ = {adjustedTotal}).</span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -810,6 +896,7 @@ export default function ChooseMyStat() {
   const [planDesign, setPlanDesign] = useState("");
   const [showGlossary, setShowGlossary] = useState(false);
   const [dark, setDark] = useState(false);
+  const [directSampleSizeCalc, setDirectSampleSizeCalc] = useState(null);
 
   // ─── Apply dark mode CSS variable for result cards ───
   useEffect(() => {
@@ -879,7 +966,17 @@ export default function ChooseMyStat() {
     setAnswers({});
     setStepIndex(0);
     setShowResults(false);
+    setDirectSampleSizeCalc(null);
   };
+
+  // Jump directly to a specific sample size calculator (from test result card)
+  const goToSampleSize = useCallback((calcId) => {
+    setMode("samplesize");
+    setAnswers({});
+    setStepIndex(0);
+    setShowResults(true);
+    setDirectSampleSizeCalc(calcId);
+  }, []);
 
   // ─── Plan Builder helpers ───
   const addToPlan = () => {
@@ -961,7 +1058,7 @@ export default function ChooseMyStat() {
   };
 
   const results = showResults
-    ? (mode === "samplesize" ? [resolveCalculator(answers)] : mode === "descriptive" ? recommendDescriptive(answers) : mode === "diagnostic" ? recommendDiagnostic(answers) : mode === "agreement" ? recommendAgreement(answers) : recommend(answers))
+    ? (mode === "samplesize" ? [directSampleSizeCalc || resolveCalculator(answers)] : mode === "descriptive" ? recommendDescriptive(answers) : mode === "diagnostic" ? recommendDiagnostic(answers) : mode === "agreement" ? recommendAgreement(answers) : recommend(answers))
     : [];
 
   // ─── Shared dark-mode class helpers ───
@@ -1479,10 +1576,10 @@ export default function ChooseMyStat() {
               : mode === "descriptive"
               ? results.map((key) => <DescriptiveResult key={key} descKey={key} useTraditional={useTraditional} />)
               : mode === "diagnostic"
-              ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={DIAGNOSTIC_TESTS} />)
+              ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={DIAGNOSTIC_TESTS} onCalcSampleSize={goToSampleSize} />)
               : mode === "agreement"
-              ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={AGREEMENT_TESTS} />)
-              : results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} />)
+              ? results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} testSource={AGREEMENT_TESTS} onCalcSampleSize={goToSampleSize} />)
+              : results.map((key) => <TestResult key={key} testKey={key} useTraditional={useTraditional} onCalcSampleSize={goToSampleSize} />)
             }
 
             {results.length === 0 && (
