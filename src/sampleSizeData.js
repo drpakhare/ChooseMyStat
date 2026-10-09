@@ -73,6 +73,7 @@ export const SS_STEPS = [
       { value: "one_sample", label: "One Group vs Reference Value", desc: "One-sample t-test: comparing sample mean to a known value", icon: "1️⃣" },
       { value: "anova", label: "3+ Groups — Continuous", desc: "One-way ANOVA / Kruskal-Wallis", icon: "👥" },
       { value: "two_proportions", label: "2 Groups — Proportions", desc: "Chi-square or Fisher's exact test", icon: "🔘" },
+      { value: "odds_ratio_cc", label: "2 Groups — Odds Ratio (Case-Control)", desc: "Case-control or cross-sectional study with OR as effect measure", icon: "🎲" },
       { value: "paired_binary", label: "Paired — Binary Outcome", desc: "McNemar's test: before/after with yes/no outcome", icon: "🔄" },
     ],
   },
@@ -607,6 +608,123 @@ Input parameters:
     sap(p, result) {
       if (!result) return "";
       return `Sample size was calculated for a two-proportion comparison (expected proportions: ${p.p1} vs ${p.p2}), α = ${p.alpha}, ${Number(p.power)*100}% power, ${Number(p.sides) === 2 ? "two-sided" : "one-sided"} test. ${Number(p.ratio) === 1 || !p.ratio ? `A minimum of ${result.n1} participants per group (${result.total} total)` : `A minimum of ${result.n1} in group 1 and ${result.n2} in group 2 (${result.total} total)`} will be required.`;
+    },
+  },
+
+  // ── 5b. Odds ratio — case-control / cross-sectional (Kelsey) ──
+  odds_ratio_cc: {
+    name: "Odds Ratio — Case-Control / Cross-Sectional (Kelsey)",
+    linkedTests: [],
+    color: "indigo",
+    parameters: [
+      { id: "p0", label: "Proportion exposed among controls (p₀)", type: "number", step: 0.01, placeholder: "e.g. 0.20 — from literature or pilot" },
+      { id: "or", label: "Expected odds ratio (OR)", type: "number", step: 0.1, placeholder: "e.g. 2.0 — clinically meaningful OR" },
+      { id: "alpha", label: "Significance level (α)", type: "select", options: [
+        { value: 0.05, label: "0.05" }, { value: 0.01, label: "0.01" }, { value: 0.10, label: "0.10" },
+      ], default: 0.05 },
+      { id: "power", label: "Power (1 − β)", type: "select", options: [
+        { value: 0.80, label: "80%" }, { value: 0.85, label: "85%" }, { value: 0.90, label: "90%" }, { value: 0.95, label: "95%" },
+      ], default: 0.80 },
+      { id: "sides", label: "Sidedness", type: "radio", options: [
+        { value: 2, label: "Two-sided" }, { value: 1, label: "One-sided" },
+      ], default: 2 },
+      { id: "ratio", label: "Controls per case (r)", type: "number", step: 1, default: 1, placeholder: "1 = equal, 2 = 2 controls per case" },
+    ],
+    compute(p) {
+      const p0 = Number(p.p0), or = Number(p.or);
+      if (!p0 || p0 <= 0 || p0 >= 1 || !or || or <= 0 || or === 1) return null;
+      const alpha = Number(p.alpha), power = Number(p.power), sides = Number(p.sides);
+      const r = Number(p.ratio) || 1;
+      // Derive p1 (proportion exposed among cases) from OR and p0
+      const p1 = or * p0 / (1 + p0 * (or - 1));
+      if (p1 <= 0 || p1 >= 1) return null;
+      const za = qnorm(1 - alpha / sides);
+      const zb = qnorm(power);
+      // Kelsey formula (Fleiss with continuity correction)
+      const pbar = (p1 + r * p0) / (1 + r);
+      const n_case = ceil(
+        (za * Math.sqrt((1 + 1/r) * pbar * (1 - pbar)) +
+         zb * Math.sqrt(p1 * (1 - p1) + p0 * (1 - p0) / r)) ** 2 /
+        ((p1 - p0) ** 2)
+      );
+      const n_ctrl = ceil(n_case * r);
+      return { n_case, n_ctrl, total: n_case + n_ctrl, p1,
+        label: r === 1
+          ? `${n_case} cases + ${n_ctrl} controls (${n_case + n_ctrl} total)`
+          : `${n_case} cases + ${n_ctrl} controls [1:${r}] (${n_case + n_ctrl} total)`,
+        formula: `Kelsey (Fleiss) formula for case-control studies:
+p₀ = ${p0} (exposure in controls)
+OR = ${or}  →  p₁ = OR×p₀ / (1 + p₀×(OR−1)) = ${p1.toFixed(4)} (exposure in cases)
+p̄ = (p₁ + r×p₀)/(1+r) = ${pbar.toFixed(4)}
+n_cases = [z_α√((1+1/r)p̄(1−p̄)) + z_β√(p₁(1−p₁)+p₀(1−p₀)/r)]² / (p₁−p₀)²
+        = ${n_case}
+n_controls = ${n_case} × ${r} = ${n_ctrl}`,
+      };
+    },
+    rCode(p) {
+      const p0 = Number(p.p0), or = Number(p.or);
+      const p1 = or * p0 / (1 + p0 * (or - 1));
+      return `# Case-control sample size — Kelsey/Fleiss formula
+library(epiR)
+
+epi.sscc(
+  OR = ${p.or},                        # expected odds ratio
+  p1 = NA,                             # let epiR derive from OR and p0
+  p0 = ${p.p0},                        # proportion exposed in controls
+  n = NA,
+  power = ${p.power},
+  r = ${Number(p.ratio) || 1},         # controls per case
+  phi.coef = 0,                        # unmatched design
+  design = 1,                          # no clustering
+  sided.test = ${p.sides},
+  nfractional = FALSE,
+  conf.level = 1 - ${p.alpha}
+)
+
+# Manual calculation (verification)
+p0 <- ${p.p0}
+OR <- ${p.or}
+p1 <- OR * p0 / (1 + p0 * (OR - 1))    # = ${p1.toFixed(4)}
+r  <- ${Number(p.ratio) || 1}
+za <- qnorm(1 - ${p.alpha} / ${p.sides})
+zb <- qnorm(${p.power})
+pbar <- (p1 + r * p0) / (1 + r)
+n_case <- ceiling(
+  (za * sqrt((1 + 1/r) * pbar * (1 - pbar)) +
+   zb * sqrt(p1*(1-p1) + p0*(1-p0)/r))^2 /
+  (p1 - p0)^2
+)
+n_ctrl <- ceiling(n_case * r)
+cat("Cases:", n_case, "\\nControls:", n_ctrl,
+    "\\nTotal:", n_case + n_ctrl, "\\n")`;
+    },
+    gpower(p) {
+      const p0 = Number(p.p0), or = Number(p.or);
+      const p1 = or * p0 / (1 + p0 * (or - 1));
+      const h = 2 * Math.asin(Math.sqrt(p1)) - 2 * Math.asin(Math.sqrt(p0));
+      return `G*Power Settings:
+Test family: z tests
+Statistical test: Proportions — Difference between two independent proportions
+Type of power analysis: A priori
+
+Note: G*Power does not have a dedicated case-control module.
+Use the two-proportion test with derived proportions:
+
+  p₁ (cases, derived from OR) = ${p1.toFixed(4)}
+  p₂ (controls) = ${p0}
+  Effect size |h| = ${Math.abs(h).toFixed(4)}
+
+Input parameters:
+  Tail(s): ${Number(p.sides) === 2 ? "Two" : "One"}
+  Effect size |h|: ${Math.abs(h).toFixed(4)}
+  α err prob: ${p.alpha}
+  Power (1-β): ${p.power}
+  Allocation ratio N2/N1: ${Number(p.ratio) || 1}`;
+    },
+    sap(p, result) {
+      if (!result) return "";
+      const r = Number(p.ratio) || 1;
+      return `Sample size was calculated for an unmatched case-control study using the Kelsey (Fleiss) formula. Assuming a proportion of exposure of ${Number(p.p0)*100}% among controls and an expected odds ratio of ${p.or}, with α = ${p.alpha}, ${Number(p.power)*100}% power, ${Number(p.sides) === 2 ? "two-sided" : "one-sided"} test, and a case-to-control ratio of 1:${r}, a minimum of ${result.n_case} cases and ${result.n_ctrl} controls (${result.total} total) will be required.`;
     },
   },
 
@@ -1442,6 +1560,13 @@ export function generateSensitivityTable(calcId, params) {
       { label: `Δp = ${diff.toFixed(2)}`, value: diff, highlight: true },
       { label: `Δp = ${(diff * 1.3).toFixed(2)}`, value: diff * 1.3 },
     );
+  } else if (calcId === "odds_ratio_cc") {
+    const or = Number(params.or);
+    effectSizes.push(
+      { label: `OR = ${(or < 1 ? or / 0.7 : or * 0.7).toFixed(2)}`, value: or < 1 ? or / 0.7 : or * 0.7 },
+      { label: `OR = ${or.toFixed(2)}`, value: or, highlight: true },
+      { label: `OR = ${(or < 1 ? or * 0.7 : or * 1.3).toFixed(2)}`, value: or < 1 ? or * 0.7 : or * 1.3 },
+    );
   } else if (calcId === "correlation") {
     const r = Number(params.r);
     effectSizes.push(
@@ -1506,6 +1631,8 @@ export function generateSensitivityTable(calcId, params) {
       } else if (calcId === "two_proportions") {
         const base_p1 = Number(params.p1);
         modParams.p2 = base_p1 + es.value * Math.sign(Number(params.p2) - Number(params.p1));
+      } else if (calcId === "odds_ratio_cc") {
+        modParams.or = es.value;
       } else if (calcId === "correlation") {
         modParams.r = es.value;
       } else if (calcId === "logrank") {
