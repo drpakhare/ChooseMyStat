@@ -1200,6 +1200,31 @@ export default function ChooseMyStat() {
             </button>
           </div>
 
+          {/* ─── Tutorials Link ─── */}
+          <a
+            href="https://drpakhare.github.io/ChooseMyStat-tutorial/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`block w-full text-left rounded-2xl shadow-lg border-2 ${card} ${dark ? "hover:border-purple-500" : "hover:border-purple-400"} hover:shadow-xl transition-all p-6 group mt-4`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="text-purple-500 group-hover:text-purple-400 transition-colors">
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+              </div>
+              <div>
+                <div className={`text-lg font-bold ${textPrimary} group-hover:text-purple-500`}>
+                  Tutorials
+                </div>
+                <div className={`text-sm ${textSecondary} mt-1`}>
+                  Step-by-step guided walkthroughs with real clinical research scenarios — learn by example
+                </div>
+              </div>
+              <div className={`ml-auto self-center text-xs font-medium px-2 py-1 rounded-full ${dark ? "bg-purple-900/50 text-purple-300" : "bg-purple-100 text-purple-600"}`}>
+                5 tutorials
+              </div>
+            </div>
+          </a>
+
           {/* ─── Core Concepts ─── */}
           <div className={`mt-6 rounded-2xl border shadow-sm overflow-hidden ${dark ? "bg-gray-900 border-gray-700" : "bg-white border-gray-200"}`}>
             <div className="px-5 pt-4 pb-1">
