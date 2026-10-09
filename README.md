@@ -30,3 +30,11 @@ npm run build
 - Dr Abhijit Pakhare — Clinical Epidemiology Unit, AIIMS Bhopal
 - Dr Ankur Joshi — Clinical Epidemiology Unit, AIIMS Bhopal
 - Claude (Anthropic) — AI assistant
+
+## How to Cite
+
+See [`CITATION.cff`](CITATION.cff), or use the "Cite this repository" button on GitHub. Each release is archived on Zenodo with a DOI.
+
+## License
+
+Released under the [MIT License](LICENSE).

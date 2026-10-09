@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use ChooseMyStat, please cite it using the metadata below."
+type: software
+title: "ChooseMyStat: An interactive statistical analysis advisor for clinical researchers"
+authors:
+  - family-names: Pakhare
+    given-names: Abhijit
+    orcid: "https://orcid.org/0000-0003-2897-4141"
+    affiliation: "Clinical Epidemiology Unit, All India Institute of Medical Sciences (AIIMS) Bhopal, India"
+  - family-names: Joshi
+    given-names: Ankur
+    orcid: "https://orcid.org/0000-0002-3766-376X"
+    affiliation: "Clinical Epidemiology Unit, All India Institute of Medical Sciences (AIIMS) Bhopal, India"
+license: MIT
+repository-code: "https://github.com/drpakhare/ChooseMyStat"
+url: "https://choose-my-stat.vercel.app"
+keywords:
+  - biostatistics
+  - statistical test selection
+  - statistical analysis plan
+  - clinical research
+  - medical education

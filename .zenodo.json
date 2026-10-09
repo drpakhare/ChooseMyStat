@@ -1,0 +1,43 @@
+{
+  "upload_type": "software",
+  "title": "ChooseMyStat: An interactive statistical analysis advisor for clinical researchers",
+  "description": "<p>ChooseMyStat is an interactive web application that guides postgraduate medical residents and clinical researchers through choosing appropriate descriptive summaries, inferential tests, diagnostic accuracy and agreement/reliability analyses, and sample size calculations for their studies.</p><p>For each recommendation it provides a Statistical Analysis Plan (SAP) template paragraph (ASA 2016 effect-first and traditional styles), a results-reporting example, point-and-click instructions for JASP, and R code (tidyverse, gtsummary, effectsize and related packages). Recommendations can be compiled into a consolidated analysis plan and exported as text, Markdown or an R script.</p><p>Developed at the Clinical Epidemiology Unit, All India Institute of Medical Sciences (AIIMS) Bhopal, with assistance from Claude (Anthropic), an AI assistant.</p>",
+  "creators": [
+    {
+      "name": "Pakhare, Abhijit",
+      "affiliation": "Clinical Epidemiology Unit, All India Institute of Medical Sciences (AIIMS) Bhopal, India",
+      "orcid": "0000-0003-2897-4141"
+    },
+    {
+      "name": "Joshi, Ankur",
+      "affiliation": "Clinical Epidemiology Unit, All India Institute of Medical Sciences (AIIMS) Bhopal, India",
+      "orcid": "0000-0002-3766-376X"
+    }
+  ],
+  "license": "MIT",
+  "access_right": "open",
+  "keywords": [
+    "biostatistics",
+    "statistical test selection",
+    "statistical analysis plan",
+    "clinical research",
+    "research methodology",
+    "medical education",
+    "sample size",
+    "JASP",
+    "R"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/drpakhare/ChooseMyStat",
+      "relation": "isSupplementTo",
+      "resource_type": "software",
+      "scheme": "url"
+    },
+    {
+      "identifier": "https://choose-my-stat.vercel.app",
+      "relation": "isDocumentedBy",
+      "scheme": "url"
+    }
+  ]
+}
