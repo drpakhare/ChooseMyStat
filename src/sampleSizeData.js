@@ -45,12 +45,22 @@ export const SS_STEPS = [
     title: "What type of analysis are you planning?",
     subtitle: "Select the analysis for which you need a sample size",
     options: [
+      { value: "estimate", label: "Estimate a Parameter", desc: "Prevalence, mean — estimating a single value with desired precision", icon: "📏" },
       { value: "compare", label: "Comparing Groups", desc: "t-test, ANOVA, chi-square — comparing means or proportions across groups", icon: "👥" },
       { value: "association", label: "Correlation / Association", desc: "Pearson or Spearman correlation between two variables", icon: "📈" },
       { value: "regression", label: "Regression Modelling", desc: "Linear or logistic regression with multiple predictors", icon: "⚙️" },
       { value: "survival", label: "Survival / Time-to-Event", desc: "Log-rank test or Cox regression", icon: "⏱" },
       { value: "diagnostic", label: "Diagnostic Test Evaluation", desc: "Sensitivity, specificity, AUC", icon: "🎯" },
       { value: "agreement", label: "Agreement / Reliability", desc: "Kappa, ICC, Bland-Altman", icon: "🤝" },
+    ],
+  },
+  {
+    id: "ss_estimate_type",
+    title: "What do you want to estimate?",
+    show: (a) => a.ss_goal === "estimate",
+    options: [
+      { value: "estimate_proportion", label: "A Proportion (prevalence)", desc: "e.g. prevalence of anaemia, smoking rate, seroprevalence", icon: "🔘" },
+      { value: "estimate_mean", label: "A Mean", desc: "e.g. mean BMI, mean HbA1c, mean blood pressure in a population", icon: "📏" },
     ],
   },
   {
@@ -108,6 +118,7 @@ export const SS_STEPS = [
 // Resolve which calculator to use from answers
 export function resolveCalculator(answers) {
   const g = answers.ss_goal;
+  if (g === "estimate") return answers.ss_estimate_type;
   if (g === "compare") return answers.ss_compare_type;
   if (g === "association") return "correlation";
   if (g === "regression") return answers.ss_regression_type;
@@ -120,6 +131,112 @@ export function resolveCalculator(answers) {
 // ━━━ CALCULATOR DEFINITIONS ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export const CALCULATORS = {
+
+  // ── 0a. Single proportion estimation (prevalence) ──
+  estimate_proportion: {
+    name: "Single Proportion Estimation (Prevalence)",
+    linkedTests: [],
+    color: "emerald",
+    parameters: [
+      { id: "p", label: "Expected proportion (p)", type: "number", step: 0.01, placeholder: "e.g. 0.52 — from literature or pilot" },
+      { id: "d", label: "Absolute precision (±d)", type: "number", step: 0.01, placeholder: "e.g. 0.05 — margin of error" },
+      { id: "conf", label: "Confidence level", type: "select", options: [
+        { value: 0.95, label: "95%" }, { value: 0.99, label: "99%" }, { value: 0.90, label: "90%" },
+      ], default: 0.95 },
+    ],
+    compute(p) {
+      const prop = Number(p.p), d = Number(p.d), conf = Number(p.conf);
+      if (!prop || prop <= 0 || prop >= 1 || !d || d <= 0) return null;
+      const z = qnorm(1 - (1 - conf) / 2);
+      const n = ceil(z * z * prop * (1 - prop) / (d * d));
+      return { n, total: n,
+        label: `${n} subjects`,
+        formula: `n = Z²×p×(1−p) / d²\n  = ${z.toFixed(4)}² × ${prop} × ${(1-prop).toFixed(4)} / ${d}²\n  = ${(z*z*prop*(1-prop)).toFixed(2)} / ${(d*d).toFixed(4)}\n  = ${n}`,
+      };
+    },
+    rCode(p) {
+      return `# Single proportion estimation — Wald CI method
+# Base R (no package needed)
+p <- ${p.p}                       # expected proportion
+d <- ${p.d}                       # desired precision (±)
+conf <- ${p.conf}                 # confidence level
+z <- qnorm(1 - (1 - conf) / 2)
+n <- ceiling(z^2 * p * (1 - p) / d^2)
+cat("Required sample size:", n, "\\n")
+
+# Alternatively, using epiR:
+library(epiR)
+epi.ssestc(
+  N = Inf,                        # infinite population
+  xbar = ${p.p},                  # not used for proportion but required
+  sigma = sqrt(${p.p} * (1 - ${p.p})),
+  epsilon = ${p.d} / ${p.p},      # relative precision
+  error = "absolute",
+  nfractional = FALSE,
+  conf.level = ${p.conf}
+)`;
+    },
+    gpower(p) {
+      return `G*Power does not have a module for single-proportion estimation (precision-based).
+Use the formula directly:
+  n = Z² × p × (1−p) / d²
+  Z = ${qnorm(1 - (1 - Number(p.conf)) / 2).toFixed(4)} (for ${Number(p.conf)*100}% confidence)
+  p = ${p.p}, d = ${p.d}
+
+Or use R/epiR as shown in the R Code tab.`;
+    },
+    sap(p, result) {
+      if (!result) return "";
+      return `To estimate the prevalence with an absolute precision of ±${Number(p.d)*100} percentage points and ${Number(p.conf)*100}% confidence, assuming an expected proportion of ${Number(p.p)*100}%, a minimum of ${result.n} subjects is required.`;
+    },
+  },
+
+  // ── 0b. Single mean estimation ──
+  estimate_mean: {
+    name: "Single Mean Estimation",
+    linkedTests: [],
+    color: "emerald",
+    parameters: [
+      { id: "sd", label: "Expected standard deviation (σ)", type: "number", step: 0.1, placeholder: "e.g. 12 — from literature or pilot" },
+      { id: "d", label: "Desired precision (±d)", type: "number", step: 0.1, placeholder: "e.g. 2 — acceptable margin of error" },
+      { id: "conf", label: "Confidence level", type: "select", options: [
+        { value: 0.95, label: "95%" }, { value: 0.99, label: "99%" }, { value: 0.90, label: "90%" },
+      ], default: 0.95 },
+    ],
+    compute(p) {
+      const sd = Number(p.sd), d = Number(p.d), conf = Number(p.conf);
+      if (!sd || sd <= 0 || !d || d <= 0) return null;
+      const z = qnorm(1 - (1 - conf) / 2);
+      const n = ceil(z * z * sd * sd / (d * d));
+      return { n, total: n,
+        label: `${n} subjects`,
+        formula: `n = Z²×σ² / d²\n  = ${z.toFixed(4)}² × ${sd}² / ${d}²\n  = ${(z*z*sd*sd).toFixed(2)} / ${(d*d).toFixed(2)}\n  = ${n}`,
+      };
+    },
+    rCode(p) {
+      return `# Single mean estimation — Wald CI method
+# Base R (no package needed)
+sigma <- ${p.sd}                  # expected SD
+d <- ${p.d}                       # desired precision (±)
+conf <- ${p.conf}                 # confidence level
+z <- qnorm(1 - (1 - conf) / 2)
+n <- ceiling(z^2 * sigma^2 / d^2)
+cat("Required sample size:", n, "\\n")`;
+    },
+    gpower(p) {
+      return `G*Power does not have a module for single-mean estimation (precision-based).
+Use the formula directly:
+  n = Z² × σ² / d²
+  Z = ${qnorm(1 - (1 - Number(p.conf)) / 2).toFixed(4)} (for ${Number(p.conf)*100}% confidence)
+  σ = ${p.sd}, d = ${p.d}
+
+Or use R as shown in the R Code tab.`;
+    },
+    sap(p, result) {
+      if (!result) return "";
+      return `To estimate the population mean with an absolute precision of ±${p.d} and ${Number(p.conf)*100}% confidence, assuming an expected standard deviation of ${p.sd}, a minimum of ${result.n} subjects is required.`;
+    },
+  },
 
   // ── 1. Independent two-sample t-test ──
   two_ind_cont: {
@@ -1339,6 +1456,41 @@ export function generateSensitivityTable(calcId, params) {
       { label: `HR = ${hr.toFixed(2)}`, value: hr, highlight: true },
       { label: `HR = ${(hr < 1 ? hr * 0.7 : hr * 1.3).toFixed(2)}`, value: hr < 1 ? hr * 0.7 : hr * 1.3 },
     );
+  } else if (calcId === "estimate_proportion") {
+    // For estimation: vary precision instead of effect size, and confidence instead of power
+    const p_val = Number(params.p), d_val = Number(params.d);
+    if (!p_val || !d_val) return null;
+    const precisions = [
+      { label: `±${(d_val * 0.5).toFixed(3)}`, value: d_val * 0.5 },
+      { label: `±${d_val.toFixed(3)}`, value: d_val, highlight: true },
+      { label: `±${(d_val * 1.5).toFixed(3)}`, value: d_val * 1.5 },
+    ];
+    const confs = [0.90, 0.95, 0.99];
+    const rows = precisions.map((pr) => {
+      const cols = confs.map((cf) => {
+        const z = qnorm(1 - (1 - cf) / 2);
+        return ceil(z * z * p_val * (1 - p_val) / (pr.value * pr.value));
+      });
+      return { label: pr.label, highlight: pr.highlight, cols };
+    });
+    return { headers: confs.map(c => `${c*100}%`), rows };
+  } else if (calcId === "estimate_mean") {
+    const sd_val = Number(params.sd), d_val = Number(params.d);
+    if (!sd_val || !d_val) return null;
+    const precisions = [
+      { label: `±${(d_val * 0.5).toFixed(1)}`, value: d_val * 0.5 },
+      { label: `±${d_val.toFixed(1)}`, value: d_val, highlight: true },
+      { label: `±${(d_val * 1.5).toFixed(1)}`, value: d_val * 1.5 },
+    ];
+    const confs = [0.90, 0.95, 0.99];
+    const rows = precisions.map((pr) => {
+      const cols = confs.map((cf) => {
+        const z = qnorm(1 - (1 - cf) / 2);
+        return ceil(z * z * sd_val * sd_val / (pr.value * pr.value));
+      });
+      return { label: pr.label, highlight: pr.highlight, cols };
+    });
+    return { headers: confs.map(c => `${c*100}%`), rows };
   } else {
     return null; // No sensitivity table for some calculators
   }
